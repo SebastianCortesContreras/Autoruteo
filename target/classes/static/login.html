@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoRuteo - Iniciar Sesión</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F0F8FF; /* Alice Blue */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: white;
+            padding: 2.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border-top: 5px solid #4FC3F7; /* Celeste */
+        }
+        h1 {
+            color: #5C6BC0; /* Bígaro (Darkened for text) */
+            margin-bottom: 1.5rem;
+            font-size: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #5C6BC0; /* Bígaro */
+            font-weight: 500;
+        }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #B3E5FC; /* Azul Bebé */
+            border-radius: 5px;
+            box-sizing: border-box; 
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: #4DD0E1; /* Aqua */
+            outline: none;
+            box-shadow: 0 0 5px #B3E5FC;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4FC3F7; /* Celeste */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #29B6F6; /* Darker Celeste */
+        }
+        .error-message {
+            color: #e74c3c;
+            margin-bottom: 1rem;
+            display: none;
+            padding: 10px;
+            background-color: #fdeaea;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>AutoRuteo</h1>
+        
+        <div id="error-msg" class="error-message">
+            Usuario o contraseña incorrectos
+        </div>
+
+        <form action="/login" method="post">
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Iniciar Sesión</button>
+        </form>
+    </div>
+
+    <script>
+        // Check for error parameter in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('error')) {
+            document.getElementById('error-msg').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

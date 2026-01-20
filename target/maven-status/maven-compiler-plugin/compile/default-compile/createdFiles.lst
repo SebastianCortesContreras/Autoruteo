@@ -1,0 +1,12 @@
+com\example\routing\domain\VehicleRoutingSolution.class
+com\example\routing\config\SecurityConfig.class
+com\example\routing\GeocodingService.class
+com\example\routing\service\RouteOptimizationService.class
+com\example\routing\domain\Depot.class
+com\example\routing\RouteController.class
+com\example\routing\RouteOrder.class
+com\example\routing\domain\Customer.class
+com\example\routing\domain\Vehicle.class
+com\example\routing\domain\Location.class
+com\example\routing\solver\VehicleRoutingConstraintProvider.class
+com\example\routing\RoutingApplication.class
