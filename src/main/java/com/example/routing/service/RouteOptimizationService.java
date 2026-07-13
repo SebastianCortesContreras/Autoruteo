@@ -15,7 +15,7 @@ import java.util.UUID;
 @Service
 public class RouteOptimizationService {
 
-    private final Solver<VehicleRoutingSolution> solver;
+    private final SolverFactory<VehicleRoutingSolution> solverFactory;
 
     public RouteOptimizationService() {
         SolverConfig solverConfig = new SolverConfig()
@@ -24,8 +24,7 @@ public class RouteOptimizationService {
                 .withConstraintProviderClass(VehicleRoutingConstraintProvider.class)
                 .withTerminationSpentLimit(Duration.ofSeconds(10)); // Optimizar por 10 segundos
 
-        SolverFactory<VehicleRoutingSolution> solverFactory = SolverFactory.create(solverConfig);
-        this.solver = solverFactory.buildSolver();
+        this.solverFactory = SolverFactory.create(solverConfig);
     }
 
     public VehicleRoutingSolution optimizeRoutes(List<Customer> customers, Location depotLocation, Integer carryCount, Integer nhrCount, Integer nprCount) {
@@ -43,7 +42,8 @@ public class RouteOptimizationService {
         // 3. Crear problema
         VehicleRoutingSolution problem = new VehicleRoutingSolution(vehicles, customers);
 
-        // 4. Resolver
+        // 4. Crear nuevo Solver y resolver
+        Solver<VehicleRoutingSolution> solver = solverFactory.buildSolver();
         VehicleRoutingSolution solution = solver.solve(problem);
         
         // 5. Post-procesamiento (Etiquetado de rutas)
@@ -106,22 +106,22 @@ public class RouteOptimizationService {
         }
 
         // 2. Prioridad: NHRs (Trip 1)
-        // Costo 100: Preferir Carrys si es posible (según solicitud "Priorizar Carrys")
-        // Pero NHR sigue siendo un vehículo real, así que el costo es bajo.
+        // Costo 300: Preferir Carrys (Trip 1 y Trip 2) si es posible
+        // Pero NHR sigue siendo un vehículo real, así que el costo es flexible.
         // ACTUALIZACIÓN: Capacidad aumentada a 3000kg (3 toneladas)
         for (int i = 0; i < numNHRs; i++) {
-            vehicles.add(new Vehicle("NHR-" + (i + 1), 3000.0, "NHR", depot, 100));
+            vehicles.add(new Vehicle("NHR-" + (i + 1), 3000.0, "NHR", depot, 300));
         }
 
         // 3. Prioridad: NPRs (Trip 1)
-        // Costo 200: Vehículo más grande (5 toneladas), preferir NHR/Carry si es posible.
+        // Costo 400: Vehículo más grande (5 toneladas), preferir NHR/Carry si es posible.
         // Se usará principalmente para pedidos > 3 toneladas o cuando se llenen los otros.
         for (int i = 0; i < numNPRs; i++) {
-            vehicles.add(new Vehicle("NPR-" + (i + 1), 5000.0, "NPR", depot, 200));
+            vehicles.add(new Vehicle("NPR-" + (i + 1), 5000.0, "NPR", depot, 400));
         }
 
         // 4. Segundo Cargue: Solo Carrys (Trip 2)
-        // Costo 50: Usar después de los primeros viajes de Carrys, pero PREFERIBLE a usar NHRs (Costo 100)
+        // Costo 50: Usar después de los primeros viajes de Carrys, pero PREFERIBLE a usar NHRs (Costo 300)
         // Esto permite que los Carrys hagan hasta 2 viajes antes de requerir vehículos más grandes.
         for (int i = 0; i < numCarrys; i++) {
             vehicles.add(new Vehicle("Carry-" + (i + 1) + "-Trip2", 750.0, "Carry (Trip 2)", depot, 50));

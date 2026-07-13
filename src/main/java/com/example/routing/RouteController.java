@@ -1,13 +1,19 @@
 package com.example.routing;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row.MissingCellPolicy;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import tech.tablesaw.api.Table;
 import tech.tablesaw.api.Row;
-import tech.tablesaw.io.xlsx.XlsxReadOptions;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,9 +75,8 @@ public class RouteController {
             File tempFile = tempDir.resolve(file.getOriginalFilename()).toFile();
             file.transferTo(tempFile);
 
-            // Leer Excel usando Tablesaw
-            XlsxReadOptions options = XlsxReadOptions.builder(tempFile).build();
-            Table table = Table.read().usingOptions(options);
+            // Leer Excel usando Apache POI directamente para evitar errores de parseo de tipos
+            Table table = readExcelAsStrings(tempFile);
             
             // Limpiar archivo temporal
             tempFile.delete();
@@ -86,7 +91,7 @@ public class RouteController {
             String colAddress = findColumn(table, "Direccion", "Dirección", "Address", "Ubicacion", "Ubicación", "Domicilio", "Calle", "Dir");
             String colLat = findColumn(table, "Latitud", "Lat", "Latitude", "Y", "Lat.");
             String colLon = findColumn(table, "Longitud", "Lon", "Lng", "Longitude", "X", "Long", "Long.");
-            String colWeight = findColumn(table, "Peso", "Weight", "Kg", "Kg.", "Kgs", "Carga", "Masa", "Volumen", "Peso Total (KG)", "zubale");
+            String colWeight = findColumn(table, "Peso", "Weight", "Kg", "Kg.", "Kgs", "Carga", "Masa", "Volumen", "Peso Total (KG)", "Peso Total", "zubale");
             String colWindow = findColumn(table, "Franja Entrega", "Franja", "Horario", "Window", "Time Window", "Ventana");
 
             System.out.println("Mapeo de columnas: ");
@@ -254,5 +259,111 @@ public class RouteController {
             } catch (Exception ignored) {}
         }
         return 0.0;
+    }
+
+    /**
+     * Lee un archivo Excel usando Apache POI y devuelve una Tabla de Tablesaw con todas las columnas como String
+     */
+    private Table readExcelAsStrings(File file) throws IOException {
+        List<String> columnNames = new ArrayList<>();
+        List<List<String>> rows = new ArrayList<>();
+
+        try (FileInputStream fis = new FileInputStream(file);
+             XSSFWorkbook workbook = new XSSFWorkbook(fis)) {
+
+            XSSFSheet sheet = workbook.getSheetAt(0);
+            if (sheet == null) {
+                return Table.create();
+            }
+
+            // Leer encabezados y manejar duplicados
+            XSSFRow headerRow = sheet.getRow(0);
+            Map<String, Integer> nameCount = new HashMap<>();
+            if (headerRow != null) {
+                for (Cell cell : headerRow) {
+                    String originalName = getCellValueAsString(cell);
+                    if (originalName == null || originalName.trim().isEmpty()) {
+                        originalName = "Columna " + (columnNames.size() + 1);
+                    }
+                    String finalName = originalName;
+                    int count = nameCount.getOrDefault(originalName, 0);
+                    if (count > 0) {
+                        finalName = originalName + "_" + count;
+                    }
+                    nameCount.put(originalName, count + 1);
+                    columnNames.add(finalName);
+                }
+            }
+
+            // Leer filas de datos
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                XSSFRow row = sheet.getRow(i);
+                if (row == null) continue;
+                List<String> rowData = new ArrayList<>();
+                for (int j = 0; j < columnNames.size(); j++) {
+                    Cell cell = row.getCell(j, MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                    rowData.add(getCellValueAsString(cell));
+                }
+                rows.add(rowData);
+            }
+        }
+
+        // Construir la Tabla de Tablesaw
+        Table table = Table.create();
+        for (int colIdx = 0; colIdx < columnNames.size(); colIdx++) {
+            String colName = columnNames.get(colIdx);
+            if (colName == null || colName.trim().isEmpty()) {
+                colName = "Columna " + (colIdx + 1);
+            }
+            tech.tablesaw.api.StringColumn col = tech.tablesaw.api.StringColumn.create(colName);
+            for (List<String> row : rows) {
+                col.append(colIdx < row.size() ? row.get(colIdx) : "");
+            }
+            table.addColumns(col);
+        }
+
+        return table;
+    }
+
+    /**
+     * Obtiene el valor de una celda como String, sin importar su tipo
+     */
+    private String getCellValueAsString(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    yield cell.getDateCellValue().toInstant().toString();
+                } else {
+                    double numVal = cell.getNumericCellValue();
+                    if (numVal == (long) numVal) {
+                        yield String.valueOf((long) numVal);
+                    } else {
+                        yield String.valueOf(numVal);
+                    }
+                }
+            }
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            case FORMULA -> {
+                try {
+                    yield cell.getStringCellValue().trim();
+                } catch (Exception e) {
+                    try {
+                        double numVal = cell.getNumericCellValue();
+                        if (numVal == (long) numVal) {
+                            yield String.valueOf((long) numVal);
+                        } else {
+                            yield String.valueOf(numVal);
+                        }
+                    } catch (Exception e2) {
+                        yield "";
+                    }
+                }
+            }
+            default -> "";
+        };
     }
 }

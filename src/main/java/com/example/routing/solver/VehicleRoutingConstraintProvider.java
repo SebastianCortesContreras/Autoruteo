@@ -106,7 +106,7 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
                 .penalizeLong(HardSoftLongScore.ONE_SOFT,
                         vehicle -> vehicle.getCustomers().stream()
                                 .filter(c -> c.getDemand() <= 500.0)
-                                .count() * 500) // Penalización para priorizar Carry
+                                .count() * 1500) // Penalización más alta para priorizar Carry primero
                 .asConstraint("Small orders prefer Carry");
     }
 

@@ -12,7 +12,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #b9ffff; /* #b9ffff */
+            background-color: #d7fffc; /* #b9ffff */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -27,7 +27,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             max-width: 800px;
             width: 90%;
-            border-top: 5px solid #2196f3; /* #2196f3 */
+            border-top: 5px solid #a9d4f7; /* #2196f3 */
         }
         h1 {
             color: #003785; /* #003785 */
@@ -132,11 +132,20 @@
     
     <div id="routes-container" class="container" style="margin-top: 20px; display: none;">
         <h2>Detalle de Rutas</h2>
+        
+        <!-- Botones de Exportación -->
+        <div style="margin-bottom: 20px; display: flex; justify-content: center; gap: 20px;">
+            <button onclick="exportRoutes('pdf')" class="btn" style="background-color: #e74c3c;">Descargar PDF</button>
+            <button onclick="exportRoutes('excel')" class="btn" style="background-color: #2ecc71;">Descargar Excel</button>
+        </div>
+
         <div id="routes-list"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
+        let currentRoutesData = [];
+
         // Manejo de la selección del depósito
         const depotSelect = document.getElementById('depotSelect');
         const customDepotContainer = document.getElementById('customDepotContainer');
@@ -195,6 +204,7 @@
                 }
 
                 const data = await response.json();
+                currentRoutesData = data.routes;
                 loader.style.display = "none";
                 
                 statusMessage.textContent = `Optimización completada. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}`;
@@ -417,6 +427,42 @@
                 card.innerHTML = tableHtml;
                 list.appendChild(card);
             });
+        }
+
+        async function exportRoutes(format) {
+            if (!currentRoutesData || currentRoutesData.length === 0) {
+                alert("No hay rutas para exportar.");
+                return;
+            }
+
+            const url = format === 'pdf' ? '/api/export/pdf' : '/api/export/excel';
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(currentRoutesData)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = format === 'pdf' ? 'rutas.pdf' : 'rutas.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    const errorText = await response.text();
+                    alert("Error al descargar el archivo: " + errorText);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert("Error al conectar con el servidor.");
+            }
         }
     </script>
 </body>

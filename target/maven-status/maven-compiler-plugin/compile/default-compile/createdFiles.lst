@@ -7,6 +7,8 @@ com\example\routing\RouteController.class
 com\example\routing\RouteOrder.class
 com\example\routing\domain\Customer.class
 com\example\routing\domain\Vehicle.class
+com\example\routing\RouteController$1.class
 com\example\routing\domain\Location.class
+com\example\routing\ExportController.class
 com\example\routing\solver\VehicleRoutingConstraintProvider.class
 com\example\routing\RoutingApplication.class
