@@ -26,7 +26,7 @@ public class RouteOptimizationService {
                 .withSolutionClass(VehicleRoutingSolution.class)
                 .withEntityClasses(Vehicle.class)
                 .withConstraintProviderClass(VehicleRoutingConstraintProvider.class)
-                .withTerminationSpentLimit(Duration.ofSeconds(10)); // Optimizar por 10 segundos
+                .withTerminationSpentLimit(Duration.ofSeconds(30)); // Dar mas tiempo para encontrar una solucion factible
 
         this.solverFactory = SolverFactory.create(solverConfig);
     }
@@ -61,6 +61,12 @@ public class RouteOptimizationService {
         log.info("Solver finalizado. vehiculosResueltos={}, clientesAsignados={}",
                 solution.getVehicleList().size(),
                 solution.getVehicleList().stream().mapToInt(v -> v.getCustomers().size()).sum());
+
+        if (solution.getScore() != null && solution.getScore().hardScore() < 0) {
+            log.warn("La solucion final sigue siendo infactible. hardScore={}, softScore={}",
+                    solution.getScore().hardScore(),
+                    solution.getScore().softScore());
+        }
         
         // 5. Post-procesamiento (Etiquetado de rutas)
         postProcessRoutes(solution);
@@ -76,23 +82,28 @@ public class RouteOptimizationService {
             long distanceMeters = vehicle.getTotalDistanceMeters();
             int stopCount = vehicle.getCustomers().size();
             double totalWeight = vehicle.getTotalDemand();
+            long exceededZoneMeters = vehicle.getExceededZoneDistanceMeters(10000);
 
             // Default status
             String status = "Ruta Optimizada";
 
+            // 0. Ruta Abierta por salir de la zona objetivo del primer pedido
+            if (exceededZoneMeters > 0) {
+                status = "Ruta Abierta";
+            }
             // 1. Ruta Dedicada: 1 pedido y (> 40km O > 500kg)
-            if (stopCount == 1 && (distanceMeters > 40000 || totalWeight > 500)) {
+            else if (stopCount == 1 && (distanceMeters > 40000 || totalWeight > 500)) {
                 status = "Ruta Dedicada";
             }
-            // 2. Ruta Abierta: Promedio < 2km por parada (ajustable)
-            else if (stopCount > 0 && (distanceMeters / (double) stopCount) < 2000) {
+            // 2. Ruta Abierta: Promedio > 2km por parada (ajustable)
+            else if (stopCount > 0 && (distanceMeters / (double) stopCount) > 2000) {
                 status = "Ruta Abierta";
             }
 
             vehicle.setRouteStatus(status);
             vehicle.setComments(status); // Mantener compatibilidad si se usa 'comments' en otro lado
-            log.info("Vehiculo {} etiquetado. status={}, paradas={}, distanciaMetros={}, pesoTotal={}",
-                    vehicle.getId(), status, stopCount, distanceMeters, totalWeight);
+            log.info("Vehiculo {} etiquetado. status={}, paradas={}, distanciaMetros={}, pesoTotal={}, excesoZonaMetros={}",
+                    vehicle.getId(), status, stopCount, distanceMeters, totalWeight, exceededZoneMeters);
         }
     }
 

@@ -2,6 +2,8 @@ package com.example.routing.domain;
 
 import ai.timefold.solver.core.api.domain.lookup.PlanningId;
 
+import java.util.Locale;
+
 public class Customer {
 
     @PlanningId
@@ -33,6 +35,13 @@ public class Customer {
     public String getName() { return name; }
     public String getAddress() { return address; }
     public String getDeliveryWindow() { return deliveryWindow; }
+
+    public String getLocationGroupingKey() {
+        if (address != null && !address.trim().isEmpty()) {
+            return "ADDRESS:" + address.trim().toLowerCase(Locale.ROOT);
+        }
+        return String.format(Locale.ROOT, "COORD:%.6f,%.6f", location.getLatitude(), location.getLongitude());
+    }
     
     @Override
     public String toString() {

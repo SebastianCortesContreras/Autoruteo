@@ -13,13 +13,17 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
         return new Constraint[] {
             vehicleCapacity(factory),
             totalDistance(factory),
+            compactRoute(factory),
             vehicleFixedCost(factory),
             noFirstWindowOnSecondTrip(factory),
             heavyOrdersInNhrOnly(factory),
+            nhrMaxOrders(factory),
             smallOrdersPreferCarry(factory),
             minimizeHypotheticalUsage(factory),
             nprMaxOrders(factory),
             nprUsageJustification(factory),
+            sameLocationSameVehicle(factory),
+            sectorizedRouteByFirstOrder(factory),
             maxDistanceBetweenStops(factory),
             maxRouteDistance(factory)
         };
@@ -40,7 +44,7 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
         return factory.forEach(Vehicle.class)
                 .filter(vehicle -> vehicle.hasLegLongerThan(5000)) // 5km limit
                 .penalizeLong(HardSoftLongScore.ONE_HARD,
-                        vehicle -> 1L)
+                        vehicle -> vehicle.getExceededLegDistanceMeters(5000))
                 .asConstraint("Max distance between stops 5km");
     }
 
@@ -60,6 +64,15 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
                 .penalizeLong(HardSoftLongScore.ONE_SOFT,
                         vehicle -> vehicle.getTotalDistanceMeters() * 100L)
                 .asConstraint("Minimize Distance");
+    }
+
+    // Soft Constraint: Favorecer secuencias de pedidos cercanos entre si
+    protected Constraint compactRoute(ConstraintFactory factory) {
+        return factory.forEach(Vehicle.class)
+                .filter(vehicle -> vehicle.getCustomers().size() > 1)
+                .penalizeLong(HardSoftLongScore.ONE_SOFT,
+                        Vehicle::getCompactnessPenalty)
+                .asConstraint("Compact route sequencing");
     }
 
     // Soft Constraint: Minimize vehicle fixed costs (prioritize specific vehicles)
@@ -97,6 +110,16 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
                 .asConstraint("Heavy orders in NHR only");
     }
 
+    // Hard Constraint: NHR vehicles max 10 orders
+    protected Constraint nhrMaxOrders(ConstraintFactory factory) {
+        return factory.forEach(Vehicle.class)
+                .filter(vehicle -> "NHR".equals(vehicle.getType()))
+                .filter(vehicle -> vehicle.getCustomers().size() > 10)
+                .penalizeLong(HardSoftLongScore.ONE_HARD,
+                        vehicle -> vehicle.getCustomers().size() - 10L)
+                .asConstraint("NHR max 10 orders");
+    }
+
     // Soft Constraint: Small orders (<= 500kg) prefer Carry (penalize if in NHR)
     protected Constraint smallOrdersPreferCarry(ConstraintFactory factory) {
         return factory.forEach(Vehicle.class)
@@ -120,6 +143,15 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
                 .asConstraint("Minimize Hypothetical Usage");
     }
 
+    // Hard Constraint: Pedidos de la misma ubicacion deben quedar en el mismo vehiculo
+    protected Constraint sameLocationSameVehicle(ConstraintFactory factory) {
+        return factory.forEachUniquePair(Vehicle.class)
+                .filter((leftVehicle, rightVehicle) -> leftVehicle.getSharedLocationKeyCount(rightVehicle) > 0)
+                .penalizeLong(HardSoftLongScore.ONE_HARD,
+                        (leftVehicle, rightVehicle) -> leftVehicle.getSharedLocationKeyCount(rightVehicle))
+                .asConstraint("Same location same vehicle");
+    }
+
     // Hard Constraint: NPR vehicles max 5 orders
     protected Constraint nprMaxOrders(ConstraintFactory factory) {
         return factory.forEach(Vehicle.class)
@@ -141,5 +173,15 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
                 .penalizeLong(HardSoftLongScore.ONE_HARD,
                         vehicle -> 1L)
                 .asConstraint("NPR used without heavy order");
+    }
+
+    // Soft Constraint: Intentar mantener todos los pedidos dentro de 10 km del primer pedido
+    protected Constraint sectorizedRouteByFirstOrder(ConstraintFactory factory) {
+        return factory.forEach(Vehicle.class)
+                .filter(vehicle -> vehicle.getCustomers().size() > 1)
+                .filter(vehicle -> vehicle.getExceededZoneDistanceMeters(10000) > 0)
+                .penalizeLong(HardSoftLongScore.ONE_SOFT,
+                        vehicle -> vehicle.getExceededZoneDistanceMeters(10000) * 50L)
+                .asConstraint("Sectorized route by first order");
     }
 }

@@ -5,7 +5,9 @@ import ai.timefold.solver.core.api.domain.lookup.PlanningId;
 import ai.timefold.solver.core.api.domain.variable.PlanningListVariable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @PlanningEntity
 public class Vehicle {
@@ -68,26 +70,100 @@ public class Vehicle {
         return totalDistance;
     }
 
+    public long getCompactnessPenalty() {
+        if (customers.isEmpty()) {
+            return 0;
+        }
+
+        long penalty = 0;
+        Location previousLocation = depot.getLocation();
+
+        for (Customer customer : customers) {
+            long legDistance = previousLocation.getDistanceTo(customer.getLocation());
+            // Penaliza mucho más los saltos largos para favorecer secuencias de pedidos cercanos.
+            penalty += (legDistance * legDistance) / 100L;
+            previousLocation = customer.getLocation();
+        }
+
+        return penalty;
+    }
+
     // Verifica si algún tramo (Depot->C1, C1->C2... o Cn->Depot) supera el límite en metros
     public boolean hasLegLongerThan(long limitMeters) {
-        if (customers.isEmpty()) return false;
+        if (customers.size() <= 1) return false;
 
-        Location previousLocation = depot.getLocation();
-        for (Customer customer : customers) {
+        Location previousLocation = customers.get(0).getLocation();
+        for (int i = 1; i < customers.size(); i++) {
+            Customer customer = customers.get(i);
             if (previousLocation.getDistanceTo(customer.getLocation()) > limitMeters) {
                 return true;
             }
             previousLocation = customer.getLocation();
         }
-        // Check return to depot logic? 
-        // El usuario dijo "pedidos de mas de 5 km", usualmente se refiere a inter-paradas.
-        // Incluir el retorno al depósito podría ser muy estricto si el depósito está lejos.
-        // Asumiremos tramos de ida y entre clientes.
-        // Si el cliente está a > 5km del depósito inicial, también cuenta.
         return false;
+    }
+
+    public long getExceededLegDistanceMeters(long limitMeters) {
+        if (customers.size() <= 1) {
+            return 0;
+        }
+
+        long totalExceededDistance = 0;
+        Location previousLocation = customers.get(0).getLocation();
+
+        for (int i = 1; i < customers.size(); i++) {
+            Customer customer = customers.get(i);
+            long legDistance = previousLocation.getDistanceTo(customer.getLocation());
+            if (legDistance > limitMeters) {
+                totalExceededDistance += (legDistance - limitMeters);
+            }
+            previousLocation = customer.getLocation();
+        }
+
+        return totalExceededDistance;
+    }
+
+    public long getExceededZoneDistanceMeters(long limitMeters) {
+        if (customers.size() <= 1) {
+            return 0;
+        }
+
+        Location anchorLocation = customers.get(0).getLocation();
+        long totalExceededDistance = 0;
+
+        for (int i = 1; i < customers.size(); i++) {
+            long distanceFromAnchor = anchorLocation.getDistanceTo(customers.get(i).getLocation());
+            if (distanceFromAnchor > limitMeters) {
+                totalExceededDistance += (distanceFromAnchor - limitMeters);
+            }
+        }
+
+        return totalExceededDistance;
     }
 
     public double getTotalDemand() {
         return customers.stream().mapToDouble(Customer::getDemand).sum();
+    }
+
+    public long getSharedLocationKeyCount(Vehicle other) {
+        if (other == null || this.customers.isEmpty() || other.customers.isEmpty()) {
+            return 0;
+        }
+
+        Set<String> ownLocationKeys = new HashSet<>();
+        for (Customer customer : this.customers) {
+            ownLocationKeys.add(customer.getLocationGroupingKey());
+        }
+
+        long sharedCount = 0;
+        Set<String> alreadyCounted = new HashSet<>();
+        for (Customer customer : other.customers) {
+            String key = customer.getLocationGroupingKey();
+            if (ownLocationKeys.contains(key) && alreadyCounted.add(key)) {
+                sharedCount++;
+            }
+        }
+
+        return sharedCount;
     }
 }
