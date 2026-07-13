@@ -8,16 +8,25 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GeocodingService {
 
     private static final Logger log = LoggerFactory.getLogger(GeocodingService.class);
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final int READ_TIMEOUT_MS = 10_000;
+    private static final long REQUEST_DELAY_MS = 1_000L;
+
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, double[]> geocodeCache = new ConcurrentHashMap<>();
     private static final String NOMINATIM_API = "https://nominatim.openstreetmap.org/search?format=json&q=";
     private static final java.util.Map<String, double[]> HARDCODED_LOCATIONS = new java.util.HashMap<>();
 
@@ -32,6 +41,13 @@ public class GeocodingService {
         HARDCODED_LOCATIONS.put("Cra. 51B #106-200, Riomar, Barranquilla, Atlántico", new double[]{11.0155, -74.8305});
     }
 
+    public GeocodingService() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        requestFactory.setReadTimeout(READ_TIMEOUT_MS);
+        this.restTemplate = new RestTemplate(requestFactory);
+    }
+
     public double[] geocodeAddress(String address) {
         try {
             if (address == null || address.trim().isEmpty()) {
@@ -39,10 +55,17 @@ public class GeocodingService {
                 return null;
             }
 
+            String normalizedAddress = address.trim();
+
             // Check hardcoded locations first
-            if (HARDCODED_LOCATIONS.containsKey(address)) {
-                log.info("Usando coordenadas hardcodeadas para la direccion: {}", address);
-                return HARDCODED_LOCATIONS.get(address);
+            if (HARDCODED_LOCATIONS.containsKey(normalizedAddress)) {
+                log.info("Usando coordenadas hardcodeadas para la direccion: {}", normalizedAddress);
+                return HARDCODED_LOCATIONS.get(normalizedAddress);
+            }
+
+            if (geocodeCache.containsKey(normalizedAddress)) {
+                log.info("Usando coordenadas cacheadas para la direccion: {}", normalizedAddress);
+                return geocodeCache.get(normalizedAddress);
             }
 
             // Nominatim requires a User-Agent
@@ -50,14 +73,14 @@ public class GeocodingService {
             headers.set("User-Agent", "RoutingAutomationApp/1.0");
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            String url = NOMINATIM_API + address.replace(" ", "+");
-            log.info("Realizando peticion de geocodificacion para direccion: {}", address);
+            String url = NOMINATIM_API + normalizedAddress.replace(" ", "+");
+            log.info("Realizando peticion de geocodificacion para direccion: {}", normalizedAddress);
             
             // Respect API usage policy (1 request per second max recommended)
-            Thread.sleep(1000); 
+            Thread.sleep(REQUEST_DELAY_MS);
 
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-            log.info("Respuesta de geocodificacion recibida para direccion: {} con estado: {}", address, response.getStatusCode());
+            log.info("Respuesta de geocodificacion recibida para direccion: {} con estado: {}", normalizedAddress, response.getStatusCode());
             
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
@@ -65,14 +88,16 @@ public class GeocodingService {
                     JsonNode firstResult = root.get(0);
                     double lat = firstResult.get("lat").asDouble();
                     double lon = firstResult.get("lon").asDouble();
-                    log.info("Geocodificacion exitosa para direccion: {} -> lat={}, lon={}", address, lat, lon);
-                    return new double[]{lat, lon};
+                    log.info("Geocodificacion exitosa para direccion: {} -> lat={}, lon={}", normalizedAddress, lat, lon);
+                    double[] coordinates = new double[]{lat, lon};
+                    geocodeCache.put(normalizedAddress, coordinates);
+                    return coordinates;
                 }
 
-                log.warn("La respuesta de geocodificacion no trajo resultados para direccion: {}", address);
+                log.warn("La respuesta de geocodificacion no trajo resultados para direccion: {}", normalizedAddress);
             } else {
                 log.warn("La geocodificacion fallo para direccion: {}. Estado={}, bodyPresente={}",
-                        address,
+                        normalizedAddress,
                         response.getStatusCode(),
                         response.getBody() != null);
             }

@@ -347,6 +347,80 @@
             border-color: #c7dbf8;
         }
 
+        .job-progress-panel {
+            display: none;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid var(--md-outline);
+            background: linear-gradient(180deg, #f9fbff 0%, #eef4fd 100%);
+        }
+
+        .job-progress-panel.is-visible {
+            display: block;
+        }
+
+        .job-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .job-progress-title {
+            margin: 0 0 4px;
+            color: var(--md-primary-dark);
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .job-progress-description {
+            margin: 0;
+            color: var(--md-text-muted);
+            line-height: 1.5;
+        }
+
+        .job-progress-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(21, 101, 192, 0.1);
+            color: var(--md-primary-dark);
+            font-size: 0.88rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .job-progress-track {
+            width: 100%;
+            height: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(21, 101, 192, 0.12);
+        }
+
+        .job-progress-fill {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--md-primary), #42a5f5);
+            transition: width 0.3s ease;
+        }
+
+        .job-progress-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            color: var(--md-text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
         .error-panel {
             display: none;
             padding: 18px;
@@ -797,6 +871,22 @@
                     <div id="loader" class="loader"></div>
                 </div>
                 <div id="statusMessage" class="status-message"></div>
+                <div id="jobProgressPanel" class="job-progress-panel">
+                    <div class="job-progress-header">
+                        <div>
+                            <h3 id="jobProgressTitle" class="job-progress-title">Preparando procesamiento</h3>
+                            <p id="jobProgressDescription" class="job-progress-description">La app te irá mostrando cada etapa para que sepas en qué va.</p>
+                        </div>
+                        <div id="jobProgressPercent" class="job-progress-chip">0%</div>
+                    </div>
+                    <div class="job-progress-track">
+                        <div id="jobProgressFill" class="job-progress-fill"></div>
+                    </div>
+                    <div class="job-progress-meta">
+                        <span id="jobProgressStage">Esperando inicio</span>
+                        <span id="jobProgressUpdated">Sin actividad aún</span>
+                    </div>
+                </div>
                 <div id="errorPanel" class="error-panel"></div>
             </div>
         </section>
@@ -836,6 +926,14 @@
         const customDepotInput = document.getElementById('customDepot');
         const statusMessage = document.getElementById('statusMessage');
         const errorPanel = document.getElementById('errorPanel');
+        const jobProgressPanel = document.getElementById('jobProgressPanel');
+        const jobProgressTitle = document.getElementById('jobProgressTitle');
+        const jobProgressDescription = document.getElementById('jobProgressDescription');
+        const jobProgressFill = document.getElementById('jobProgressFill');
+        const jobProgressPercent = document.getElementById('jobProgressPercent');
+        const jobProgressStage = document.getElementById('jobProgressStage');
+        const jobProgressUpdated = document.getElementById('jobProgressUpdated');
+        let currentJobPoller = null;
 
         function setStatus(message, type) {
             statusMessage.textContent = message;
@@ -845,6 +943,67 @@
         function hideErrorPanel() {
             errorPanel.className = 'error-panel';
             errorPanel.innerHTML = '';
+        }
+
+        function stopJobPolling() {
+            if (currentJobPoller) {
+                clearInterval(currentJobPoller);
+                currentJobPoller = null;
+            }
+        }
+
+        function hideJobProgress() {
+            stopJobPolling();
+            jobProgressPanel.className = 'job-progress-panel';
+            jobProgressTitle.textContent = 'Preparando procesamiento';
+            jobProgressDescription.textContent = 'La app te irá mostrando cada etapa para que sepas en qué va.';
+            jobProgressFill.style.width = '0%';
+            jobProgressPercent.textContent = '0%';
+            jobProgressStage.textContent = 'Esperando inicio';
+            jobProgressUpdated.textContent = 'Sin actividad aún';
+        }
+
+        function formatJobStage(stage) {
+            const labels = {
+                QUEUED: 'En cola',
+                STARTING: 'Iniciando',
+                PREPARING: 'Preparando archivo',
+                GEOCODING_DEPOT: 'Ubicando depósito',
+                READING_FILE: 'Leyendo Excel',
+                MAPPING_COLUMNS: 'Detectando columnas',
+                PROCESSING_ROWS: 'Procesando pedidos',
+                OPTIMIZING: 'Optimizando rutas',
+                BUILDING_RESPONSE: 'Armando respuesta',
+                COMPLETED: 'Completado',
+                FAILED: 'Falló'
+            };
+            return labels[stage] || stage || 'Procesando';
+        }
+
+        function renderJobProgress(job) {
+            const progress = Number.isFinite(Number(job?.progress)) ? Number(job.progress) : 0;
+            const updatedAt = job?.updatedAt ? new Date(job.updatedAt).toLocaleTimeString('es-CO') : 'Sin actualización';
+
+            jobProgressPanel.className = 'job-progress-panel is-visible';
+            jobProgressTitle.textContent = formatJobStage(job?.stage);
+            jobProgressDescription.textContent = job?.message || 'Procesando archivo en segundo plano.';
+            jobProgressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`;
+            jobProgressPercent.textContent = `${Math.round(progress)}%`;
+            jobProgressStage.textContent = `Estado: ${job?.status || 'RUNNING'}`;
+            jobProgressUpdated.textContent = `Última actualización: ${updatedAt}`;
+        }
+
+        function buildJobError(job) {
+            return {
+                kind: 'job',
+                status: null,
+                statusText: null,
+                rawText: job?.error?.technicalDetails || job?.message || 'Error durante el procesamiento.',
+                parsed: job?.error || null,
+                code: job?.error?.type || job?.status || null,
+                message: job?.error?.message || job?.message || 'Error durante el procesamiento.',
+                requestId: job?.error?.requestId || null
+            };
         }
 
         function escapeHtml(value) {
@@ -914,6 +1073,24 @@
                         'Prueba primero con un archivo más pequeño para confirmar si el tiempo de procesamiento es la causa.',
                         'Revisa los logs del backend usando el request id para encontrar el punto exacto de falla.',
                         'Si ocurre siempre con el mismo archivo, es probable que haya una dirección, columna o dato que dispara el problema.'
+                    ]
+                };
+            }
+
+            if ((normalized.code || '').toLowerCase().includes('illegalargument')) {
+                return {
+                    shortMessage: 'El archivo no se pudo procesar con los datos enviados.',
+                    title: 'La validación del archivo falló durante el procesamiento',
+                    description: 'El backend sí leyó la solicitud, pero encontró datos insuficientes o inválidos para construir rutas útiles.',
+                    causes: [
+                        'No se encontraron pedidos con coordenadas válidas.',
+                        'Faltan columnas clave como dirección, latitud, longitud o peso.',
+                        'El contenido del archivo no coincide con el formato esperado.'
+                    ],
+                    actions: [
+                        'Verifica que la primera fila tenga encabezados claros.',
+                        'Prueba con un archivo más pequeño que ya haya funcionado para comparar.',
+                        'Abre el detalle técnico para ver el mensaje exacto devuelto por el backend.'
                     ]
                 };
             }
@@ -1041,6 +1218,100 @@
             setStatus(descriptor.shortMessage, 'error');
         }
 
+        function applyRouteDisplayNames(routes) {
+            let nhrCount = 0;
+            let nprCount = 0;
+            let carryCount = 0;
+            let hypotheticalCount = 0;
+
+            routes.forEach((route, index) => {
+                const type = (route.vehicleType || '').toUpperCase();
+                const id = route.vehicleId || '';
+
+                if (type.includes('HIPOTÉTICO') || type.includes('HYPOTHETICAL')) {
+                    hypotheticalCount++;
+                    route.displayName = `Hipotético ${hypotheticalCount}`;
+                } else if (type.includes('NPR')) {
+                    const match = id.match(/NPR-(\d+)/);
+                    const number = match ? match[1] : (++nprCount);
+                    route.displayName = `NPR ${number}`;
+                } else if (type.includes('NHR')) {
+                    const match = id.match(/NHR-(\d+)/);
+                    const number = match ? match[1] : (++nhrCount);
+                    route.displayName = `NHR ${number}`;
+                } else if (type.includes('CARRY')) {
+                    const match = id.match(/Carry-(\d+)/);
+                    const number = match ? match[1] : (++carryCount);
+                    route.displayName = id.includes('Trip2')
+                        ? `Carry ${number} (2da Vuelta)`
+                        : `Carry ${number}`;
+                } else {
+                    route.displayName = route.vehicleId || `Ruta ${index + 1}`;
+                }
+            });
+        }
+
+        function applyOptimizationResult(data) {
+            const mapContainer = document.getElementById('map');
+
+            currentRoutesData = data.routes || [];
+            applyRouteDisplayNames(currentRoutesData);
+            hideErrorPanel();
+            renderJobProgress({
+                status: 'COMPLETED',
+                stage: 'COMPLETED',
+                progress: 100,
+                message: `Proceso completado. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}.`,
+                updatedAt: new Date().toISOString()
+            });
+            setStatus(`Optimización completada. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}`, 'success');
+
+            mapContainer.style.display = 'block';
+            initMap(currentRoutesData);
+            displayRoutesTable(currentRoutesData, data.totalVehiclesUsed, data.unassigned);
+            mapContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function fetchJobStatus(jobId) {
+            const response = await fetch(`/api/routes/upload/${jobId}`);
+            if (!response.ok) {
+                throw await createHttpError(response);
+            }
+            return response.json();
+        }
+
+        async function startPollingJob(jobId) {
+            stopJobPolling();
+
+            const tick = async () => {
+                const job = await fetchJobStatus(jobId);
+                renderJobProgress(job);
+
+                if (job.status === 'COMPLETED') {
+                    stopJobPolling();
+                    if (job.result) {
+                        applyOptimizationResult(job.result);
+                    } else {
+                        throw new Error('El job terminó sin devolver resultado.');
+                    }
+                    return;
+                }
+
+                if (job.status === 'FAILED') {
+                    stopJobPolling();
+                    renderErrorPanel(buildJobError(job));
+                }
+            };
+
+            await tick();
+            currentJobPoller = setInterval(() => {
+                tick().catch(error => {
+                    stopJobPolling();
+                    renderErrorPanel(error);
+                });
+            }, 1500);
+        }
+
         depotSelect.addEventListener('change', function() {
             if (this.value === 'other') {
                 customDepotContainer.style.display = 'block';
@@ -1086,7 +1357,8 @@
             });
 
             hideErrorPanel();
-            setStatus('Procesando y optimizando rutas... esto puede tardar unos segundos.', 'info');
+            hideJobProgress();
+            setStatus('Archivo recibido. Vamos a procesarlo en segundo plano y te mostraremos el avance.', 'info');
             loader.style.display = 'block';
             mapContainer.style.display = 'none';
 
@@ -1105,55 +1377,19 @@
                     throw await createHttpError(response);
                 }
 
-                const data = await response.json();
-                console.info('[AutoRuteo] Rutas procesadas correctamente', {
-                    totalVehiclesUsed: data.totalVehiclesUsed,
-                    unassigned: data.unassigned,
-                    routes: data.routes?.length || 0
+                const job = await response.json();
+                console.info('[AutoRuteo] Job de procesamiento creado', {
+                    jobId: job.jobId,
+                    status: job.status
                 });
 
-                currentRoutesData = data.routes;
                 loader.style.display = 'none';
-                hideErrorPanel();
-                setStatus(`Optimización completada. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}`, 'success');
-
-                let nhrCount = 0;
-                let nprCount = 0;
-                let carryCount = 0;
-                let hypotheticalCount = 0;
-
-                data.routes.forEach((route, index) => {
-                    const type = (route.vehicleType || '').toUpperCase();
-                    const id = route.vehicleId || '';
-
-                    if (type.includes('HIPOTÉTICO') || type.includes('HYPOTHETICAL')) {
-                        hypotheticalCount++;
-                        route.displayName = `Hipotético ${hypotheticalCount}`;
-                    } else if (type.includes('NPR')) {
-                        const match = id.match(/NPR-(\d+)/);
-                        const number = match ? match[1] : (++nprCount);
-                        route.displayName = `NPR ${number}`;
-                    } else if (type.includes('NHR')) {
-                        const match = id.match(/NHR-(\d+)/);
-                        const number = match ? match[1] : (++nhrCount);
-                        route.displayName = `NHR ${number}`;
-                    } else if (type.includes('CARRY')) {
-                        const match = id.match(/Carry-(\d+)/);
-                        const number = match ? match[1] : (++carryCount);
-                        route.displayName = id.includes('Trip2')
-                            ? `Carry ${number} (2da Vuelta)`
-                            : `Carry ${number}`;
-                    } else {
-                        route.displayName = route.vehicleId || `Ruta ${index + 1}`;
-                    }
-                });
-
-                mapContainer.style.display = 'block';
-                initMap(data.routes);
-                displayRoutesTable(data.routes, data.totalVehiclesUsed, data.unassigned);
-                mapContainer.scrollIntoView({ behavior: 'smooth' });
+                renderJobProgress(job);
+                setStatus('Procesamiento iniciado. Te iremos mostrando cada etapa.', 'info');
+                await startPollingJob(job.jobId);
             } catch (error) {
                 console.error('[AutoRuteo] Error procesando archivo de rutas', error);
+                stopJobPolling();
                 loader.style.display = 'none';
                 renderErrorPanel(error);
             }
