@@ -347,6 +347,124 @@
             border-color: #c7dbf8;
         }
 
+        .error-panel {
+            display: none;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid #f5c6cb;
+            background: linear-gradient(180deg, #fff8f8 0%, #fdecec 100%);
+            color: #7f1d1d;
+        }
+
+        .error-panel.is-visible {
+            display: block;
+        }
+
+        .error-panel-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .error-panel-icon {
+            width: 44px;
+            height: 44px;
+            flex: 0 0 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: rgba(198, 40, 40, 0.12);
+            color: var(--md-error);
+        }
+
+        .error-panel-title {
+            margin: 0 0 4px;
+            color: #8a1c1c;
+            font-size: 1.04rem;
+            font-weight: 700;
+        }
+
+        .error-panel-description {
+            margin: 0;
+            color: #7a3d3d;
+            line-height: 1.5;
+        }
+
+        .error-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .error-meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid #efcaca;
+            color: #8a1c1c;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+
+        .error-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .error-card {
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid #f1d0d0;
+        }
+
+        .error-card h4 {
+            margin: 0 0 10px;
+            font-size: 0.95rem;
+            color: #8a1c1c;
+        }
+
+        .error-list {
+            margin: 0;
+            padding-left: 18px;
+            color: #7a3d3d;
+            line-height: 1.5;
+        }
+
+        .error-list li + li {
+            margin-top: 8px;
+        }
+
+        .error-details {
+            border-top: 1px solid #efcaca;
+            padding-top: 12px;
+        }
+
+        .error-details summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #8a1c1c;
+        }
+
+        .error-raw {
+            margin: 10px 0 0;
+            padding: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-radius: 14px;
+            background: rgba(122, 61, 61, 0.08);
+            color: #6d2e2e;
+            font-size: 0.88rem;
+        }
+
         .loader-wrap {
             display: flex;
             justify-content: center;
@@ -556,7 +674,8 @@
             }
 
             .form-grid,
-            .hero-stats {
+            .hero-stats,
+            .error-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -678,6 +797,7 @@
                     <div id="loader" class="loader"></div>
                 </div>
                 <div id="statusMessage" class="status-message"></div>
+                <div id="errorPanel" class="error-panel"></div>
             </div>
         </section>
 
@@ -715,10 +835,210 @@
         const customDepotContainer = document.getElementById('customDepotContainer');
         const customDepotInput = document.getElementById('customDepot');
         const statusMessage = document.getElementById('statusMessage');
+        const errorPanel = document.getElementById('errorPanel');
 
         function setStatus(message, type) {
             statusMessage.textContent = message;
             statusMessage.className = `status-message is-visible is-${type}`;
+        }
+
+        function hideErrorPanel() {
+            errorPanel.className = 'error-panel';
+            errorPanel.innerHTML = '';
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        async function createHttpError(response) {
+            const rawText = await response.text();
+            let parsed = null;
+
+            try {
+                parsed = JSON.parse(rawText);
+            } catch (_) {
+                parsed = null;
+            }
+
+            return {
+                kind: 'http',
+                status: response.status,
+                statusText: response.statusText,
+                rawText,
+                parsed,
+                code: parsed?.code || response.status,
+                message: parsed?.message || rawText || response.statusText || 'Error desconocido',
+                requestId: parsed?.request_id || parsed?.requestId || null
+            };
+        }
+
+        function normalizeUnexpectedError(error) {
+            if (error?.kind === 'http') {
+                return error;
+            }
+
+            return {
+                kind: 'unexpected',
+                status: null,
+                statusText: null,
+                rawText: error?.message || 'Error inesperado',
+                parsed: null,
+                code: null,
+                message: error?.message || 'Error inesperado',
+                requestId: null
+            };
+        }
+
+        function getErrorDescriptor(error) {
+            const normalized = normalizeUnexpectedError(error);
+            const status = normalized.status || normalized.code;
+            const message = (normalized.message || '').toLowerCase();
+
+            if (status === 502 || message.includes('application failed to respond')) {
+                return {
+                    shortMessage: 'El servidor no alcanzó a responder a tiempo.',
+                    title: 'La aplicación backend no respondió a tiempo',
+                    description: 'La carga salió bien desde esta pantalla, pero el servidor se quedó sin responder antes de terminar el procesamiento. Por eso el proxy devolvió un error 502.',
+                    causes: [
+                        'El archivo puede tener muchas filas y el proceso tardó demasiado.',
+                        'La geocodificación de varias direcciones pudo ralentizar o bloquear la respuesta.',
+                        'El backend pudo reiniciarse, quedarse sin recursos o lanzar una excepción antes de responder.'
+                    ],
+                    actions: [
+                        'Prueba primero con un archivo más pequeño para confirmar si el tiempo de procesamiento es la causa.',
+                        'Revisa los logs del backend usando el request id para encontrar el punto exacto de falla.',
+                        'Si ocurre siempre con el mismo archivo, es probable que haya una dirección, columna o dato que dispara el problema.'
+                    ]
+                };
+            }
+
+            if (status === 400) {
+                return {
+                    shortMessage: 'Hay un problema con los datos enviados en el archivo.',
+                    title: 'El archivo o sus datos no pasaron la validación',
+                    description: 'La aplicación sí respondió, pero rechazó la solicitud porque encontró datos faltantes, columnas no reconocidas o coordenadas inválidas.',
+                    causes: [
+                        'Las columnas esperadas no coinciden con los alias que reconoce el backend.',
+                        'No se encontraron direcciones o coordenadas válidas para construir pedidos.',
+                        'Algún valor numérico o franja horaria no pudo interpretarse correctamente.'
+                    ],
+                    actions: [
+                        'Verifica nombres de columnas como dirección, peso, latitud y longitud.',
+                        'Confirma que el archivo tenga encabezados en la primera fila.',
+                        'Prueba con 2 o 3 filas conocidas para aislar el dato conflictivo.'
+                    ]
+                };
+            }
+
+            if (status === 500) {
+                return {
+                    shortMessage: 'El backend falló mientras procesaba el archivo.',
+                    title: 'Se produjo un error interno en el servidor',
+                    description: 'La solicitud llegó al backend, pero algo falló durante la lectura del Excel, la geocodificación o la optimización.',
+                    causes: [
+                        'Un dato inesperado disparó una excepción dentro del procesamiento.',
+                        'La lectura del Excel pudo fallar por formato o contenido.',
+                        'La etapa de optimización pudo romperse por datos inconsistentes.'
+                    ],
+                    actions: [
+                        'Revisar los logs del backend te dirá exactamente en qué clase o paso ocurrió.',
+                        'Si el archivo es nuevo, prueba con uno que antes sí funcionaba para comparar.',
+                        'Usa el detalle técnico de abajo para ver el mensaje exacto devuelto.'
+                    ]
+                };
+            }
+
+            if (message.includes('failed to fetch') || message.includes('networkerror')) {
+                return {
+                    shortMessage: 'No se pudo conectar con el servidor.',
+                    title: 'La pantalla no pudo comunicarse con el backend',
+                    description: 'Esto suele pasar cuando el backend no está levantado, cambió la ruta, o hubo un corte de red durante la petición.',
+                    causes: [
+                        'La aplicación backend no está corriendo o se cayó.',
+                        'Hay un problema de red, proxy o CORS en el entorno.',
+                        'La petición fue interrumpida antes de recibir respuesta.'
+                    ],
+                    actions: [
+                        'Confirma que el backend esté arriba y respondiendo.',
+                        'Reintenta la operación para descartar un fallo temporal.',
+                        'Revisa la consola y la pestaña de red del navegador si vuelve a repetirse.'
+                    ]
+                };
+            }
+
+            return {
+                shortMessage: 'Ocurrió un error y necesitamos más detalle para identificarlo.',
+                title: 'Se produjo un error no clasificado',
+                description: 'La aplicación recibió una respuesta de error, pero no encaja en los casos más comunes. Dejé el detalle técnico abajo para que podamos ubicarlo mejor.',
+                causes: [
+                    'Puede ser un error puntual de datos, backend o infraestructura.',
+                    'La respuesta pudo venir desde un proxy o servicio intermedio.',
+                    'También puede ser un fallo nuevo no contemplado aún en la interfaz.'
+                ],
+                actions: [
+                    'Revisa el detalle técnico expandible.',
+                    'Si vuelve a ocurrir, comparte el request id y el mensaje exacto.',
+                    'Con eso podemos ir directo al log o al punto de falla real.'
+                ]
+            };
+        }
+
+        function renderErrorPanel(error) {
+            const normalized = normalizeUnexpectedError(error);
+            const descriptor = getErrorDescriptor(normalized);
+            const statusChip = normalized.status
+                ? `<div class="error-meta-chip"><span class="material-symbols-outlined">error</span>HTTP ${escapeHtml(normalized.status)}</div>`
+                : '';
+            const requestChip = normalized.requestId
+                ? `<div class="error-meta-chip"><span class="material-symbols-outlined">tag</span>Request ID: ${escapeHtml(normalized.requestId)}</div>`
+                : '';
+            const codeChip = normalized.code && normalized.code !== normalized.status
+                ? `<div class="error-meta-chip"><span class="material-symbols-outlined">code</span>Código: ${escapeHtml(normalized.code)}</div>`
+                : '';
+            const rawDetail = normalized.rawText || normalized.message || 'Sin detalle técnico.';
+
+            errorPanel.innerHTML = `
+                <div class="error-panel-header">
+                    <div class="error-panel-icon">
+                        <span class="material-symbols-outlined">warning</span>
+                    </div>
+                    <div>
+                        <h3 class="error-panel-title">${escapeHtml(descriptor.title)}</h3>
+                        <p class="error-panel-description">${escapeHtml(descriptor.description)}</p>
+                    </div>
+                </div>
+                <div class="error-meta">
+                    ${statusChip}
+                    ${codeChip}
+                    ${requestChip}
+                </div>
+                <div class="error-grid">
+                    <div class="error-card">
+                        <h4>Posibles causas</h4>
+                        <ul class="error-list">
+                            ${descriptor.causes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="error-card">
+                        <h4>Qué revisar ahora</h4>
+                        <ul class="error-list">
+                            ${descriptor.actions.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+                <details class="error-details">
+                    <summary>Ver detalle técnico</summary>
+                    <pre class="error-raw">${escapeHtml(rawDetail)}</pre>
+                </details>
+            `;
+            errorPanel.className = 'error-panel is-visible';
+            setStatus(descriptor.shortMessage, 'error');
         }
 
         depotSelect.addEventListener('change', function() {
@@ -765,6 +1085,7 @@
                 nhrCount: nhrCountVal
             });
 
+            hideErrorPanel();
             setStatus('Procesando y optimizando rutas... esto puede tardar unos segundos.', 'info');
             loader.style.display = 'block';
             mapContainer.style.display = 'none';
@@ -781,7 +1102,7 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(await response.text());
+                    throw await createHttpError(response);
                 }
 
                 const data = await response.json();
@@ -793,6 +1114,7 @@
 
                 currentRoutesData = data.routes;
                 loader.style.display = 'none';
+                hideErrorPanel();
                 setStatus(`Optimización completada. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}`, 'success');
 
                 let nhrCount = 0;
@@ -833,7 +1155,7 @@
             } catch (error) {
                 console.error('[AutoRuteo] Error procesando archivo de rutas', error);
                 loader.style.display = 'none';
-                setStatus('Error: ' + error.message, 'error');
+                renderErrorPanel(error);
             }
         });
 
