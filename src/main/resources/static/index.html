@@ -4,152 +4,722 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AutoRuteo</title>
-    <!-- Leaflet CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Outlined:FILL@0;1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
     <style>
+        :root {
+            --md-primary: #1565c0;
+            --md-primary-dark: #0d47a1;
+            --md-secondary: #26a69a;
+            --md-surface: #ffffff;
+            --md-surface-soft: #f6f8fc;
+            --md-background: #eef3f9;
+            --md-outline: #d7e2f0;
+            --md-outline-strong: #b8c6d8;
+            --md-text: #1b1f24;
+            --md-text-muted: #5f6b7a;
+            --md-error: #c62828;
+            --md-success: #2e7d32;
+            --md-shadow: 0 10px 30px rgba(21, 101, 192, 0.08);
+            --md-shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
+            --md-radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            padding: 0;
-            background-color: #d7fffc; /* #b9ffff */
+            min-height: 100vh;
+            font-family: 'Roboto', sans-serif;
+            color: var(--md-text);
+            background:
+                radial-gradient(circle at top right, rgba(38, 166, 154, 0.16), transparent 24%),
+                radial-gradient(circle at top left, rgba(21, 101, 192, 0.18), transparent 30%),
+                var(--md-background);
+        }
+
+        .app-shell {
+            width: min(1200px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 24px 0 48px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 999px;
+            box-shadow: var(--md-shadow-soft);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 52px;
+            height: 52px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 18px;
+            background: linear-gradient(135deg, var(--md-primary), #42a5f5);
+            color: #fff;
+            box-shadow: var(--md-shadow-soft);
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .brand p,
+        .hero-copy p,
+        .section-subtitle,
+        .field-hint,
+        .summary-label,
+        .metric-label,
+        .route-meta,
+        .empty-state p {
+            margin: 0;
+            color: var(--md-text-muted);
+        }
+
+        .top-pill,
+        .hero-badge,
+        .summary-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            font-size: 0.92rem;
+            font-weight: 500;
+        }
+
+        .top-pill {
+            padding: 10px 16px;
+            background: rgba(21, 101, 192, 0.08);
+            color: var(--md-primary);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+            gap: 24px;
+            align-items: stretch;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--md-surface);
+            border-radius: var(--md-radius);
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            box-shadow: var(--md-shadow);
+        }
+
+        .hero-panel,
+        .upload-panel {
+            min-height: 100%;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
         }
-        .container {
-            text-align: center;
-            background-color: white;
-            padding: 2rem;
-            margin: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 800px;
-            width: 90%;
-            border-top: 5px solid #a9d4f7; /* #2196f3 */
+
+        .hero-panel {
+            gap: 24px;
+            padding: 32px;
         }
-        h1 {
-            color: #003785; /* #003785 */
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
+
+        .upload-panel {
+            gap: 18px;
+            padding: 28px;
         }
-        p {
-            color: #1465bb; /* #1465bb (darker for readability) */
-            font-size: 1rem;
+
+        .hero-badge {
+            width: fit-content;
+            padding: 8px 14px;
+            background: rgba(38, 166, 154, 0.12);
+            color: #00695c;
         }
-        .btn {
-            display: inline-block;
-            margin-top: 1rem;
-            padding: 10px 20px;
-            background-color: #1465bb; /* #1465bb */
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-            cursor: pointer;
-            border: none;
-            font-size: 1rem;
+
+        .hero-copy h2 {
+            margin: 0 0 12px;
+            font-size: clamp(2rem, 3.6vw, 3rem);
+            line-height: 1.08;
+            letter-spacing: -0.03em;
         }
-        .btn:hover {
-            background-color: #003785; /* #003785 */
+
+        .hero-copy p {
+            font-size: 1.05rem;
+            line-height: 1.6;
+            max-width: 60ch;
         }
-        #map {
-            height: 500px;
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .stat-card {
+            padding: 16px;
+            border-radius: 20px;
+            background: var(--md-surface-soft);
+            border: 1px solid var(--md-outline);
+        }
+
+        .stat-value {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--md-primary-dark);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .field label {
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .input,
+        .select,
+        .file-input {
             width: 100%;
-            margin-top: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: none; /* Oculto inicialmente */
-            border: 2px solid #81c9fa; /* #81c9fa */
+            min-height: 56px;
+            padding: 16px 18px;
+            border: 1px solid var(--md-outline);
+            border-radius: 16px;
+            background: #fff;
+            color: var(--md-text);
+            font: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #2196f3; /* #2196f3 */
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 1rem auto;
+
+        .input:focus,
+        .select:focus,
+        .file-input:focus {
+            outline: none;
+            border-color: var(--md-primary);
+            box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.12);
+        }
+
+        .select {
+            appearance: none;
+            background-image:
+                linear-gradient(45deg, transparent 50%, var(--md-primary) 50%),
+                linear-gradient(135deg, var(--md-primary) 50%, transparent 50%);
+            background-position:
+                calc(100% - 24px) calc(50% - 3px),
+                calc(100% - 18px) calc(50% - 3px);
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+            padding-right: 48px;
+        }
+
+        .file-input {
+            padding: 12px 14px;
+        }
+
+        .file-input::file-selector-button {
+            margin-right: 12px;
+            padding: 10px 14px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(21, 101, 192, 0.12);
+            color: var(--md-primary-dark);
+            font: inherit;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 52px;
+            padding: 0 22px;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--md-shadow-soft);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--md-primary), #1976d2);
+            color: #fff;
+        }
+
+        .btn-success {
+            background: #e8f5e9;
+            color: var(--md-success);
+        }
+
+        .btn-danger {
+            background: #ffebee;
+            color: var(--md-error);
+        }
+
+        .status-message {
             display: none;
+            padding: 14px 16px;
+            border: 1px solid transparent;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
+
+        .status-message.is-visible {
+            display: block;
+        }
+
+        .status-message.is-success {
+            background: #edf7ed;
+            color: var(--md-success);
+            border-color: #c8e6c9;
+        }
+
+        .status-message.is-error {
+            background: #fdecec;
+            color: var(--md-error);
+            border-color: #f5c6cb;
+        }
+
+        .status-message.is-info {
+            background: #e8f1fd;
+            color: var(--md-primary-dark);
+            border-color: #c7dbf8;
+        }
+
+        .loader-wrap {
+            display: flex;
+            justify-content: center;
+        }
+
+        .loader {
+            display: none;
+            width: 36px;
+            height: 36px;
+            border: 4px solid rgba(21, 101, 192, 0.15);
+            border-top-color: var(--md-primary);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        #map {
+            width: 100%;
+            height: 560px;
+            display: none;
+            border-radius: var(--md-radius);
+            overflow: hidden;
+            box-shadow: var(--md-shadow);
+        }
+
+        .section-card {
+            margin-top: 24px;
+            padding: 28px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .summary-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .summary-chip {
+            padding: 10px 14px;
+            background: var(--md-surface-soft);
+            color: var(--md-text);
+            border: 1px solid var(--md-outline);
+        }
+
+        #routes-list {
+            display: grid;
+            gap: 18px;
+        }
+
+        .route-card {
+            background: var(--md-surface-soft);
+            border: 1px solid var(--md-outline);
+            border-radius: 24px;
+            overflow: hidden;
+        }
+
+        .route-card-header {
+            padding: 22px 22px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .route-card-title {
+            margin: 0 0 8px;
+            color: var(--md-primary-dark);
+            font-size: 1.18rem;
+        }
+
+        .route-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .metric {
+            min-width: 140px;
+            padding: 12px 14px;
+            border: 1px solid var(--md-outline);
+            border-radius: 18px;
+            background: #fff;
+        }
+
+        .metric-value {
+            display: block;
+            color: var(--md-text);
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .route-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            padding: 0 22px 22px;
+        }
+
+        .orders-table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            border: 1px solid var(--md-outline);
+            border-radius: 20px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .orders-table th,
+        .orders-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #ecf1f7;
+            text-align: left;
+        }
+
+        .orders-table th {
+            background: #f2f6fb;
+            color: var(--md-primary-dark);
+            font-size: 0.84rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .orders-table tbody tr:hover {
+            background: #f8fbff;
+        }
+
+        .align-right {
+            text-align: right !important;
+        }
+
+        .align-center {
+            text-align: center !important;
+        }
+
+        .empty-state {
+            padding: 32px 24px;
+            text-align: center;
+            border: 1px dashed var(--md-outline-strong);
+            border-radius: 24px;
+            background: var(--md-surface-soft);
+        }
+
+        .empty-state .material-symbols-outlined {
+            margin-bottom: 8px;
+            font-size: 42px;
+            color: var(--md-primary);
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings:
+                'FILL' 1,
+                'wght' 500,
+                'GRAD' 0,
+                'opsz' 24;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        @media (max-width: 960px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .app-shell {
+                width: min(100% - 20px, 1200px);
+                padding-top: 16px;
+            }
+
+            .top-bar,
+            .hero-panel,
+            .upload-panel,
+            .section-card {
+                padding: 20px;
+                border-radius: 22px;
+            }
+
+            .top-bar {
+                border-radius: 28px;
+            }
+
+            .form-grid,
+            .hero-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            #map {
+                height: 420px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>AutoRuteo</h1>
-        <p>Sistema de Automatización y Optimización de Rutas</p>
-        
-        <div style="margin: 2rem 0; padding: 2rem; border: 2px dashed #81c9fa; border-radius: 10px; background-color: #f0f8ff;">
-            <h2 style="color: #003785; margin-top: 0;">Cargar Archivo de Rutas</h2>
-            <p style="font-size: 0.9rem; margin-bottom: 1rem; color: #1465bb;">Sube tu archivo Excel (.xlsx) con la información de las rutas</p>
-            
-            <form id="uploadForm" enctype="multipart/form-data" style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                
-                <div style="width: 80%; text-align: left; display: flex; gap: 20px;">
-        <div style="flex: 1;">
-            <label for="carryCount" style="display: block; margin-bottom: 5px; color: #003785; font-weight: bold;">Cantidad de Carrys:</label>
-            <input type="number" id="carryCount" name="carryCount" value="10" min="0" style="width: 100%; padding: 10px; border: 1px solid #81c9fa; border-radius: 5px;" />
-        </div>
-        <div style="flex: 1;">
-            <label for="nhrCount" style="display: block; margin-bottom: 5px; color: #003785; font-weight: bold;">Cantidad de NHR:</label>
-            <input type="number" id="nhrCount" name="nhrCount" value="10" min="0" style="width: 100%; padding: 10px; border: 1px solid #81c9fa; border-radius: 5px;" />
-        </div>
-    </div>
+    <div class="app-shell">
+        <header class="top-bar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <span class="material-symbols-outlined">route</span>
+                </div>
+                <div>
+                    <h1>AutoRuteo</h1>
+                    <p>Planificación visual de rutas con una interfaz clara y moderna.</p>
+                </div>
+            </div>
+            <div class="top-pill">
+                <span class="material-symbols-outlined">local_shipping</span>
+                Optimización logística
+            </div>
+        </header>
 
-    <div style="width: 80%; text-align: left;">
-        <label for="depotSelect" style="display: block; margin-bottom: 5px; color: #003785; font-weight: bold;">Seleccionar Depósito / Sitio de Cargue:</label>
-                    <select id="depotSelect" name="depotSelect" style="width: 100%; padding: 10px; border: 1px solid #81c9fa; border-radius: 5px; background-color: white;">
-                        <option value="Cra. 45 #192 - 18, Bogotá">Cumara (Cra. 45 #192 - 18, Bogotá)</option>
-                        <option value="Cl. 81b #72-32, Bogotá">Boyaca (Cl. 81b #72-32, Bogotá)</option>
-                        <option value="Carrera 63 # 57G Calle 47 Sur, Bogotá">Villa del Rio (Carrera 63 # 57G Calle 47 Sur, Bogotá)</option>
-                        <option value="Cra. 51B #106-200, Riomar, Barranquilla, Atlántico">Villa Santos (Cra. 51B #106-200, Riomar, Barranquilla, Atlántico)</option>
-                        <option value="other">Agregar dirección o ubicación personalizada...</option>
-                    </select>
+        <section class="hero">
+            <div class="card hero-panel">
+                <div class="hero-badge">
+                    <span class="material-symbols-outlined">bolt</span>
+                    Flujo rápido de carga y optimización
+                </div>
+                <div class="hero-copy">
+                    <h2>Convierte un Excel en rutas optimizadas y listas para despachar.</h2>
+                    <p>
+                        Sube el archivo, define la flota disponible y revisa el resultado en mapa, tabla y exportaciones con una experiencia visual inspirada en Material Design.
+                    </p>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-card">
+                        <span class="stat-value">Excel</span>
+                        <p>Importación simple de pedidos</p>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">Mapa</span>
+                        <p>Visualización clara por ruta</p>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">PDF/XLSX</span>
+                        <p>Exportación lista para operación</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card upload-panel">
+                <div>
+                    <h2 class="section-title">Cargar archivo de rutas</h2>
+                    <p class="section-subtitle">Sube tu archivo Excel y configura el depósito y la flota disponible.</p>
                 </div>
 
-                <div id="customDepotContainer" style="width: 80%; text-align: left; display: none;">
-                    <label for="customDepot" style="display: block; margin-bottom: 5px; color: #003785; font-weight: bold;">Dirección del Depósito:</label>
-                    <input type="text" id="customDepot" name="customDepot" placeholder="Ej: Calle 123 # 45-67, Bogotá" style="width: 100%; padding: 10px; border: 1px solid #81c9fa; border-radius: 5px; box-sizing: border-box;" />
+                <form id="uploadForm" class="upload-form" enctype="multipart/form-data">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="carryCount">Cantidad de Carrys</label>
+                            <input class="input" type="number" id="carryCount" name="carryCount" value="10" min="0" />
+                        </div>
+                        <div class="field">
+                            <label for="nhrCount">Cantidad de NHR</label>
+                            <input class="input" type="number" id="nhrCount" name="nhrCount" value="10" min="0" />
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="depotSelect">Seleccionar depósito / sitio de cargue</label>
+                        <select class="select" id="depotSelect" name="depotSelect">
+                            <option value="Cra. 45 #192 - 18, Bogotá">Cumara (Cra. 45 #192 - 18, Bogotá)</option>
+                            <option value="Cl. 81b #72-32, Bogotá">Boyaca (Cl. 81b #72-32, Bogotá)</option>
+                            <option value="Carrera 63 # 57G Calle 47 Sur, Bogotá">Villa del Rio (Carrera 63 # 57G Calle 47 Sur, Bogotá)</option>
+                            <option value="Cra. 51B #106-200, Riomar, Barranquilla, Atlántico">Villa Santos (Cra. 51B #106-200, Riomar, Barranquilla, Atlántico)</option>
+                            <option value="other">Agregar dirección o ubicación personalizada...</option>
+                        </select>
+                        <p class="field-hint">Puedes usar una ubicación frecuente o escribir una personalizada.</p>
+                    </div>
+
+                    <div id="customDepotContainer" class="field" style="display: none;">
+                        <label for="customDepot">Dirección del depósito</label>
+                        <input class="input" type="text" id="customDepot" name="customDepot" placeholder="Ej: Calle 123 # 45-67, Bogotá" />
+                    </div>
+
+                    <div class="field">
+                        <label for="fileInput">Archivo Excel</label>
+                        <input class="file-input" type="file" id="fileInput" name="file" accept=".xlsx, .xls" required />
+                        <p class="field-hint">Formato admitido: .xlsx o .xls con direcciones, pesos y franjas.</p>
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="material-symbols-outlined">upload_file</span>
+                            Subir y procesar
+                        </button>
+                        <div class="top-pill">
+                            <span class="material-symbols-outlined">schedule</span>
+                            El proceso puede tardar unos segundos
+                        </div>
+                    </div>
+                </form>
+
+                <div class="loader-wrap">
+                    <div id="loader" class="loader"></div>
                 </div>
+                <div id="statusMessage" class="status-message"></div>
+            </div>
+        </section>
 
-                <input type="file" id="fileInput" name="file" accept=".xlsx, .xls" required style="padding: 10px; border: 1px solid #81c9fa; border-radius: 5px; width: 80%; background-color: white;" />
-                <button type="submit" class="btn" style="background-color: #2196f3;">Subir y Procesar</button>
-            </form>
-            <div id="loader" class="loader"></div>
-            <div id="statusMessage" style="margin-top: 1rem; color: #e74c3c;"></div>
-        </div>
+        <div id="map"></div>
 
+        <section id="routes-container" class="card section-card" style="display: none;">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Detalle de rutas</h2>
+                    <p class="section-subtitle">Explora la asignación por vehículo, peso, distancia y secuencia de entregas.</p>
+                </div>
+                <div class="actions">
+                    <button onclick="exportRoutes('pdf')" class="btn btn-danger">
+                        <span class="material-symbols-outlined">picture_as_pdf</span>
+                        Descargar PDF
+                    </button>
+                    <button onclick="exportRoutes('excel')" class="btn btn-success">
+                        <span class="material-symbols-outlined">table_view</span>
+                        Descargar Excel
+                    </button>
+                </div>
+            </div>
 
-    </div>
-
-    <!-- Contenedor del Mapa -->
-    <div id="map" class="container" style="padding: 0; overflow: hidden;"></div>
-    
-    <div id="routes-container" class="container" style="margin-top: 20px; display: none;">
-        <h2>Detalle de Rutas</h2>
-        
-        <!-- Botones de Exportación -->
-        <div style="margin-bottom: 20px; display: flex; justify-content: center; gap: 20px;">
-            <button onclick="exportRoutes('pdf')" class="btn" style="background-color: #e74c3c;">Descargar PDF</button>
-            <button onclick="exportRoutes('excel')" class="btn" style="background-color: #2ecc71;">Descargar Excel</button>
-        </div>
-
-        <div id="routes-list"></div>
+            <div id="routes-summary" class="summary-chips"></div>
+            <div id="routes-list"></div>
+        </section>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         let currentRoutesData = [];
+        let map = null;
 
-        // Manejo de la selección del depósito
         const depotSelect = document.getElementById('depotSelect');
         const customDepotContainer = document.getElementById('customDepotContainer');
         const customDepotInput = document.getElementById('customDepot');
+        const statusMessage = document.getElementById('statusMessage');
+
+        function setStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message is-visible is-${type}`;
+        }
 
         depotSelect.addEventListener('change', function() {
             if (this.value === 'other') {
@@ -158,24 +728,22 @@
             } else {
                 customDepotContainer.style.display = 'none';
                 customDepotInput.required = false;
-                customDepotInput.value = ''; // Limpiar si se oculta
+                customDepotInput.value = '';
             }
         });
 
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const fileInput = document.getElementById('fileInput');
-            const statusMessage = document.getElementById('statusMessage');
             const loader = document.getElementById('loader');
             const mapContainer = document.getElementById('map');
-            
+
             if (!fileInput.files[0]) {
-                statusMessage.textContent = "Por favor selecciona un archivo.";
+                setStatus('Por favor selecciona un archivo.', 'error');
                 return;
             }
 
-            // Obtener dirección del depósito
             let depotAddress = depotSelect.value;
             if (depotAddress === 'other') {
                 depotAddress = customDepotInput.value;
@@ -188,6 +756,7 @@
             const nhrCountVal = document.getElementById('nhrCount')?.value || '10';
             formData.append('carryCount', carryCountVal);
             formData.append('nhrCount', nhrCountVal);
+
             console.info('[AutoRuteo] Enviando archivo para procesamiento', {
                 fileName: fileInput.files[0].name,
                 fileSize: fileInput.files[0].size,
@@ -196,15 +765,16 @@
                 nhrCount: nhrCountVal
             });
 
-            statusMessage.textContent = "Procesando y optimizando rutas... esto puede tardar unos segundos.";
-            loader.style.display = "block";
-            mapContainer.style.display = "none";
+            setStatus('Procesando y optimizando rutas... esto puede tardar unos segundos.', 'info');
+            loader.style.display = 'block';
+            mapContainer.style.display = 'none';
 
             try {
                 const response = await fetch('/api/routes/upload', {
                     method: 'POST',
                     body: formData
                 });
+
                 console.info('[AutoRuteo] Respuesta recibida de /api/routes/upload', {
                     ok: response.ok,
                     status: response.status
@@ -220,76 +790,59 @@
                     unassigned: data.unassigned,
                     routes: data.routes?.length || 0
                 });
+
                 currentRoutesData = data.routes;
-                loader.style.display = "none";
-                
-                statusMessage.textContent = `Optimización completada. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}`;
-                statusMessage.style.color = '#27ae60';
+                loader.style.display = 'none';
+                setStatus(`Optimización completada. Vehículos usados: ${data.totalVehiclesUsed}. Pedidos no asignados: ${data.unassigned}`, 'success');
 
-                // Renombrar rutas secuencialmente
-            let nhrCount = 0;
-            let nprCount = 0;
-            let carryCount = 0;
-            let hypotheticalCount = 0;
-            
-            data.routes.forEach((route, index) => {
-                const type = (route.vehicleType || '').toUpperCase();
-                const id = route.vehicleId || '';
+                let nhrCount = 0;
+                let nprCount = 0;
+                let carryCount = 0;
+                let hypotheticalCount = 0;
 
-                if (type.includes('HIPOTÉTICO') || type.includes('HYPOTHETICAL')) {
-                    hypotheticalCount++;
-                    route.displayName = `Hipotético ${hypotheticalCount}`;
-                } else if (type.includes('NPR')) {
-                    const match = id.match(/NPR-(\d+)/);
-                    const number = match ? match[1] : (++nprCount);
-                    route.displayName = `NPR ${number}`;
-                } else if (type.includes('NHR')) {
-                    // Extraer número si es posible del ID para mantener consistencia, o usar contador simple
-                    // ID formato: NHR-1
-                    const match = id.match(/NHR-(\d+)/);
-                    const number = match ? match[1] : (++nhrCount);
-                    route.displayName = `NHR ${number}`;
-                } else if (type.includes('CARRY')) {
-                    // ID formato: Carry-1 o Carry-1-Trip2
-                    const match = id.match(/Carry-(\d+)/);
-                    const number = match ? match[1] : (++carryCount);
-                    
-                    if (id.includes('Trip2')) {
-                        route.displayName = `Carry ${number} (2da Vuelta)`;
+                data.routes.forEach((route, index) => {
+                    const type = (route.vehicleType || '').toUpperCase();
+                    const id = route.vehicleId || '';
+
+                    if (type.includes('HIPOTÉTICO') || type.includes('HYPOTHETICAL')) {
+                        hypotheticalCount++;
+                        route.displayName = `Hipotético ${hypotheticalCount}`;
+                    } else if (type.includes('NPR')) {
+                        const match = id.match(/NPR-(\d+)/);
+                        const number = match ? match[1] : (++nprCount);
+                        route.displayName = `NPR ${number}`;
+                    } else if (type.includes('NHR')) {
+                        const match = id.match(/NHR-(\d+)/);
+                        const number = match ? match[1] : (++nhrCount);
+                        route.displayName = `NHR ${number}`;
+                    } else if (type.includes('CARRY')) {
+                        const match = id.match(/Carry-(\d+)/);
+                        const number = match ? match[1] : (++carryCount);
+                        route.displayName = id.includes('Trip2')
+                            ? `Carry ${number} (2da Vuelta)`
+                            : `Carry ${number}`;
                     } else {
-                        route.displayName = `Carry ${number}`;
+                        route.displayName = route.vehicleId || `Ruta ${index + 1}`;
                     }
-                } else {
-                    route.displayName = route.vehicleId || `Ruta ${index + 1}`;
-                }
-            });
+                });
 
-                // Inicializar mapa
-                mapContainer.style.display = "block";
+                mapContainer.style.display = 'block';
                 initMap(data.routes);
-                displayRoutesTable(data.routes);
-                
-                // Scroll hacia el mapa
+                displayRoutesTable(data.routes, data.totalVehiclesUsed, data.unassigned);
                 mapContainer.scrollIntoView({ behavior: 'smooth' });
-
             } catch (error) {
                 console.error('[AutoRuteo] Error procesando archivo de rutas', error);
-                loader.style.display = "none";
-                statusMessage.textContent = "Error: " + error.message;
-                statusMessage.style.color = '#e74c3c';
+                loader.style.display = 'none';
+                setStatus('Error: ' + error.message, 'error');
             }
         });
 
-        let map = null;
-
         function initMap(routes) {
-            // Si el mapa ya existe, limpiarlo
             if (map) {
                 map.remove();
             }
 
-            // Calcular centro inicial (promedio del primer vehículo o default)
-            let centerLat = 4.6097; // Bogotá default
+            let centerLat = 4.6097;
             let centerLon = -74.0817;
 
             if (routes.length > 0 && routes[0].orders.length > 0) {
@@ -297,25 +850,22 @@
                 centerLon = routes[0].orders[0].location.longitude;
             }
 
-            // Crear mapa
             map = L.map('map').setView([centerLat, centerLon], 13);
 
-            // Agregar capa de OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            const colors = ['blue', 'red', 'green', 'purple', 'orange', 'darkblue', 'darkred', 'cadetblue'];
+            const colors = ['#1565c0', '#ef5350', '#26a69a', '#7e57c2', '#fb8c00', '#3949ab', '#8e24aa', '#00897b'];
             let colorIndex = 0;
             const bounds = [];
 
             routes.forEach(route => {
                 const color = colors[colorIndex % colors.length];
                 colorIndex++;
-                
+
                 const pathCoords = [];
-                
-                // Marcadores para cada pedido
+
                 route.orders.forEach((order, index) => {
                     const lat = order.location.latitude;
                     const lon = order.location.longitude;
@@ -326,8 +876,9 @@
                     const marker = L.circleMarker(latLng, {
                         color: color,
                         fillColor: color,
-                        fillOpacity: 0.8,
-                        radius: 8
+                        fillOpacity: 0.85,
+                        radius: 8,
+                        weight: 2
                     }).addTo(map);
 
                     marker.bindPopup(`
@@ -341,27 +892,32 @@
                     `);
                 });
 
-                // Dibujar línea de ruta (aproximada, línea recta entre puntos)
                 if (pathCoords.length > 1) {
                     L.polyline(pathCoords, {
                         color: color,
-                        weight: 3,
-                        opacity: 0.7,
-                        dashArray: '5, 10'
+                        weight: 4,
+                        opacity: 0.75
                     }).addTo(map);
                 }
             });
 
-            // Ajustar vista para mostrar todos los marcadores
             if (bounds.length > 0) {
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
         }
 
-        function displayRoutesTable(routes) {
+        function getRouteBadgeColor(comment) {
+            if (comment && comment.includes('Dedicada')) return '#7b1fa2';
+            if (comment && comment.includes('Abierta')) return '#2e7d32';
+            return '#1565c0';
+        }
+
+        function displayRoutesTable(routes, totalVehiclesUsed, unassigned) {
             const container = document.getElementById('routes-container');
             const list = document.getElementById('routes-list');
+            const summary = document.getElementById('routes-summary');
             list.innerHTML = '';
+            summary.innerHTML = '';
 
             if (!routes || routes.length === 0) {
                 container.style.display = 'none';
@@ -369,51 +925,69 @@
             }
 
             container.style.display = 'block';
+            summary.innerHTML = `
+                <div class="summary-chip">
+                    <span class="material-symbols-outlined">route</span>
+                    <span><span class="summary-label">Rutas</span> ${totalVehiclesUsed ?? routes.length}</span>
+                </div>
+                <div class="summary-chip">
+                    <span class="material-symbols-outlined">assignment_late</span>
+                    <span><span class="summary-label">No asignados</span> ${unassigned ?? 0}</span>
+                </div>
+                <div class="summary-chip">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span><span class="summary-label">Pedidos</span> ${routes.reduce((acc, route) => acc + (route.orders?.length || 0), 0)}</span>
+                </div>
+            `;
 
             routes.forEach(route => {
                 const card = document.createElement('div');
-                card.style.marginBottom = '20px';
-                card.style.padding = '15px';
-                card.style.border = '1px solid #B3E5FC'; // Azul Bebé
-                card.style.borderRadius = '5px';
-                card.style.backgroundColor = '#fff';
+                card.className = 'route-card';
 
-                // Determinar color del badge según el comentario
-                let badgeColor = '#4FC3F7'; // Celeste (Optimizado)
-                if (route.comments && route.comments.includes('Abierta')) {
-                    badgeColor = '#66BB6A'; // Menta (Abierta)
-                }
-                
-                // Ruta dedicada
-                 if (route.comments && route.comments.includes('Dedicada')) {
-                    badgeColor = '#7E57C2'; // Bígaro/Purple (Dedicada)
-                }
-
-                const commentHtml = route.comments 
-                    ? `<span style="display: inline-block; background-color: ${badgeColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-left: 10px; vertical-align: middle;">${route.comments}</span>` 
+                const badgeColor = getRouteBadgeColor(route.comments);
+                const commentHtml = route.comments
+                    ? `<span class="route-badge" style="background-color: ${badgeColor};">${route.comments}</span>`
                     : '';
 
-                // Usar el valor formateado del backend si existe, sino calcularlo
                 const distanceText = route.totalDistanceKm || (route.totalDistance / 1000).toFixed(2) + ' km';
 
                 let tableHtml = `
-                    <h3 style="margin-top: 0; color: #5C6BC0;">${route.displayName} ${commentHtml}</h3>
-                    <div style="margin: 6px 0 10px; color: #78909C; font-size: 1.1em;">
-                        Peso total: <b>${Math.round(route.totalLoad || 0)}</b> kg <span style="color:#B3E5FC">|</span> 
-                        Distancia Total: <b>${distanceText}</b>
+                    <div class="route-card-header">
+                        <div>
+                            <h3 class="route-card-title">${route.displayName}</h3>
+                            <p class="route-meta">${route.vehicleType || 'Vehículo'} · ${route.vehicleId || 'Sin identificador'}</p>
+                        </div>
+                        <div>${commentHtml}</div>
                     </div>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">
-                        <thead>
-                            <tr style="background-color: #E1F5FE;">
-                                <th style="padding: 8px; border: 1px solid #B3E5FC; text-align: left; color: #5C6BC0;">ID</th>
-                                <th style="padding: 8px; border: 1px solid #B3E5FC; text-align: left; color: #5C6BC0;">Cliente</th>
-                                <th style="padding: 8px; border: 1px solid #B3E5FC; text-align: left; color: #5C6BC0;">Dirección</th>
-                                <th style="padding: 8px; border: 1px solid #B3E5FC; text-align: right; color: #5C6BC0;">Km Acum.</th>
-                                <th style="padding: 8px; border: 1px solid #B3E5FC; text-align: right; color: #5C6BC0;">Peso (kg)</th>
-                                <th style="padding: 8px; border: 1px solid #B3E5FC; text-align: center; color: #5C6BC0;">Franja</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="route-card-header" style="padding-top: 0;">
+                        <div class="route-metrics">
+                            <div class="metric">
+                                <span class="metric-label">Peso total</span>
+                                <span class="metric-value">${Math.round(route.totalLoad || 0)} kg</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Distancia total</span>
+                                <span class="metric-value">${distanceText}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Pedidos</span>
+                                <span class="metric-value">${route.orders?.length || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cliente</th>
+                                    <th>Dirección</th>
+                                    <th class="align-right">Km acum.</th>
+                                    <th class="align-right">Peso</th>
+                                    <th class="align-center">Franja</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
 
                 route.orders.forEach(order => {
@@ -426,19 +1000,20 @@
 
                     tableHtml += `
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #B3E5FC;">${order.id}</td>
-                            <td style="padding: 8px; border: 1px solid #B3E5FC;">${order.name}</td>
-                            <td style="padding: 8px; border: 1px solid #B3E5FC;">${order.address}</td>
-                            <td style="padding: 8px; border: 1px solid #B3E5FC; text-align: right;">${order.accumulatedDistanceKm || '-'}</td>
-                            <td style="padding: 8px; border: 1px solid #B3E5FC; text-align: right;">${Math.round(order.demand)}</td>
-                            <td style="padding: 8px; border: 1px solid #B3E5FC; text-align: center;">${displayWindow}</td>
+                            <td>${order.id}</td>
+                            <td>${order.name}</td>
+                            <td>${order.address}</td>
+                            <td class="align-right">${order.accumulatedDistanceKm || '-'}</td>
+                            <td class="align-right">${Math.round(order.demand)}</td>
+                            <td class="align-center">${displayWindow}</td>
                         </tr>
                     `;
                 });
 
                 tableHtml += `
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 `;
 
                 card.innerHTML = tableHtml;
@@ -449,7 +1024,7 @@
         async function exportRoutes(format) {
             if (!currentRoutesData || currentRoutesData.length === 0) {
                 console.warn('[AutoRuteo] Se intento exportar sin rutas cargadas');
-                alert("No hay rutas para exportar.");
+                alert('No hay rutas para exportar.');
                 return;
             }
 
@@ -459,7 +1034,7 @@
                 url,
                 routes: currentRoutesData.length
             });
-            
+
             try {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -468,6 +1043,7 @@
                     },
                     body: JSON.stringify(currentRoutesData)
                 });
+
                 console.info('[AutoRuteo] Respuesta recibida de exportacion', {
                     format,
                     ok: response.ok,
@@ -480,6 +1056,7 @@
                         format,
                         bytes: blob.size
                     });
+
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
@@ -490,11 +1067,11 @@
                 } else {
                     const errorText = await response.text();
                     console.error('[AutoRuteo] Error en exportacion', { format, errorText });
-                    alert("Error al descargar el archivo: " + errorText);
+                    alert('Error al descargar el archivo: ' + errorText);
                 }
             } catch (error) {
                 console.error('[AutoRuteo] Error al conectar con el servidor durante exportacion', error);
-                alert("Error al conectar con el servidor.");
+                alert('Error al conectar con el servidor.');
             }
         }
     </script>
