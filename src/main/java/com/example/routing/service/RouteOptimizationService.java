@@ -3,13 +3,13 @@ package com.example.routing.service;
 import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.config.solver.SolverConfig;
+import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import com.example.routing.domain.*;
 import com.example.routing.solver.VehicleRoutingConstraintProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,11 +22,22 @@ public class RouteOptimizationService {
     private final SolverFactory<VehicleRoutingSolution> solverFactory;
 
     public RouteOptimizationService() {
+        // Termination: cap total solving time AND stop early if no improvement is found,
+        // so the solver returns a good (not necessarily optimal) solution instead of
+        // exhausting memory/CPU on larger datasets (e.g. 38+ clients, 28+ vehicles).
+        TerminationConfig terminationConfig = new TerminationConfig()
+                .withSecondsSpentLimit(8L)
+                .withUnimprovedSecondsSpentLimit(3L);
+
         SolverConfig solverConfig = new SolverConfig()
                 .withSolutionClass(VehicleRoutingSolution.class)
                 .withEntityClasses(Vehicle.class)
                 .withConstraintProviderClass(VehicleRoutingConstraintProvider.class)
-                .withTerminationSpentLimit(Duration.ofSeconds(10)); // Reducir carga en Railway y responder mas rapido
+                .withTerminationConfig(terminationConfig)
+                // Keep move evaluation single-threaded: multi-threaded solving multiplies
+                // the working memory footprint (one solution clone per thread), which is
+                // what drives the OutOfMemory crashes on Railway's constrained instances.
+                .withMoveThreadCount("NONE");
 
         this.solverFactory = SolverFactory.create(solverConfig);
     }
