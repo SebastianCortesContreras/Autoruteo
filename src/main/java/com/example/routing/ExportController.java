@@ -19,6 +19,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -28,6 +30,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/export")
 public class ExportController {
+
+    private static final Logger log = LoggerFactory.getLogger(ExportController.class);
 
     private String getDeliveryWindowLabel(String windowCode) {
         if (windowCode == null) {
@@ -42,6 +46,7 @@ public class ExportController {
 
     @PostMapping("/pdf")
     public ResponseEntity<byte[]> exportPdf(@RequestBody List<Map<String, Object>> routes) throws IOException {
+        log.info("Solicitud de exportacion PDF recibida. rutas={}", routes != null ? routes.size() : 0);
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document();
             PdfWriter.getInstance(document, out);
@@ -117,18 +122,21 @@ public class ExportController {
             }
 
             document.close();
+            log.info("PDF generado correctamente. bytes={}", out.size());
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=rutas.pdf")
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(out.toByteArray());
         } catch (DocumentException e) {
+            log.error("Fallo la generacion del PDF.", e);
             throw new IOException("Error creating PDF", e);
         }
     }
 
     @PostMapping("/excel")
     public ResponseEntity<byte[]> exportExcel(@RequestBody List<Map<String, Object>> routes) throws IOException {
+         log.info("Solicitud de exportacion Excel recibida. rutas={}", routes != null ? routes.size() : 0);
          try (Workbook workbook = new XSSFWorkbook();
               ByteArrayOutputStream out = new ByteArrayOutputStream()) {
              
@@ -199,6 +207,7 @@ public class ExportController {
              }
              
              workbook.write(out);
+             log.info("Excel generado correctamente. bytes={}", out.size());
              return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=rutas.xlsx")
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

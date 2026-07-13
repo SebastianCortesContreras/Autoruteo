@@ -9,6 +9,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tech.tablesaw.api.Table;
 import tech.tablesaw.api.Row;
 
@@ -35,6 +37,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/routes")
 public class RouteController {
 
+    private static final Logger log = LoggerFactory.getLogger(RouteController.class);
+
     private final GeocodingService geocodingService;
     private final RouteOptimizationService routeOptimizationService;
 
@@ -50,7 +54,10 @@ public class RouteController {
             @RequestParam(value = "carryCount", required = false, defaultValue = "10") Integer carryCount,
             @RequestParam(value = "nhrCount", required = false, defaultValue = "10") Integer nhrCount,
             @RequestParam(value = "nprCount", required = false, defaultValue = "5") Integer nprCount) {
+        log.info("Solicitud de carga recibida. archivo={}, size={}, depotAddress={}, carryCount={}, nhrCount={}, nprCount={}",
+                file.getOriginalFilename(), file.getSize(), depotAddress, carryCount, nhrCount, nprCount);
         if (file.isEmpty()) {
+            log.warn("Se recibio un archivo vacio en /api/routes/upload");
             return ResponseEntity.badRequest().body("Por favor selecciona un archivo.");
         }
 
@@ -58,13 +65,15 @@ public class RouteController {
             // Procesar dirección del depósito si existe
             Location depotLocation = null;
             if (depotAddress != null && !depotAddress.trim().isEmpty()) {
+                log.info("Intentando geocodificar deposito: {}", depotAddress);
                 double[] depotCoords = geocodingService.geocodeAddress(depotAddress);
                 if (depotCoords != null) {
                     depotLocation = new Location(depotCoords[0], depotCoords[1]);
+                    log.info("Deposito geocodificado correctamente: lat={}, lon={}", depotCoords[0], depotCoords[1]);
                 } else {
                     // Si falla geocoding, podríamos retornar error o advertencia, 
                     // por ahora logueamos y dejamos que use el centroide o lógica por defecto si se prefiere
-                    System.out.println("No se pudo geocodificar el depósito: " + depotAddress);
+                    log.warn("No se pudo geocodificar el deposito: {}. Se usara la logica de respaldo.", depotAddress);
                     // Opcional: Retornar error al usuario
                     // return ResponseEntity.badRequest().body("No se pudo encontrar la ubicación del depósito: " + depotAddress);
                 }
@@ -73,16 +82,19 @@ public class RouteController {
             // Guardar archivo temporalmente
             Path tempDir = Files.createTempDirectory("routes_upload");
             File tempFile = tempDir.resolve(file.getOriginalFilename()).toFile();
+            log.info("Guardando archivo temporal en: {}", tempFile.getAbsolutePath());
             file.transferTo(tempFile);
 
             // Leer Excel usando Apache POI directamente para evitar errores de parseo de tipos
             Table table = readExcelAsStrings(tempFile);
+            log.info("Archivo leido correctamente. Filas={}, columnas={}", table.rowCount(), table.columnCount());
             
             // Limpiar archivo temporal
-            tempFile.delete();
+            boolean deleted = tempFile.delete();
+            log.info("Archivo temporal eliminado={} path={}", deleted, tempFile.getAbsolutePath());
 
             // Mapeo flexible de columnas
-            System.out.println("Columnas detectadas en el archivo: " + table.columnNames());
+            log.info("Columnas detectadas en el archivo: {}", table.columnNames());
             
             List<Customer> customers = new ArrayList<>();
             
@@ -94,11 +106,11 @@ public class RouteController {
             String colWeight = findColumn(table, "Peso", "Weight", "Kg", "Kg.", "Kgs", "Carga", "Masa", "Volumen", "Peso Total (KG)", "Peso Total", "zubale");
             String colWindow = findColumn(table, "Franja Entrega", "Franja", "Horario", "Window", "Time Window", "Ventana");
 
-            System.out.println("Mapeo de columnas: ");
-            System.out.println("Dirección -> " + colAddress);
-            System.out.println("Peso -> " + colWeight);
-            System.out.println("Franja -> " + colWindow);
+            log.info("Mapeo de columnas detectado. direccion={}, peso={}, franja={}, latitud={}, longitud={}, id={}, cliente={}",
+                    colAddress, colWeight, colWindow, colLat, colLon, colId, colClient);
 
+            int geocodedCustomers = 0;
+            int invalidRows = 0;
             for (Row row : table) {
                 String id = (colId != null) ? getRowString(row, colId) : UUID.randomUUID().toString();
                 String client = (colClient != null) ? getRowString(row, colClient) : "Desconocido";
@@ -116,24 +128,39 @@ public class RouteController {
 
                 // Validación y Geocoding
                 if (!isValidCoordinate(lat, lon) && !address.isEmpty()) {
+                    log.info("Coordenadas invalidas para pedido {}. Se intentara geocodificar direccion: {}", id, address);
                     double[] coords = geocodingService.geocodeAddress(address);
                     if (coords != null) {
                         lat = coords[0];
                         lon = coords[1];
+                        geocodedCustomers++;
+                    } else {
+                        log.warn("No se pudo geocodificar el pedido {} con direccion: {}", id, address);
                     }
                 }
 
                 if (isValidCoordinate(lat, lon)) {
                     customers.add(new Customer(id, new Location(lat, lon), roundedWeight, client, address, deliveryWindow));
+                } else {
+                    invalidRows++;
+                    log.warn("Fila descartada por coordenadas invalidas. pedido={}, cliente={}, direccion={}", id, client, address);
                 }
             }
 
+            log.info("Procesamiento de filas completado. clientesValidos={}, geocodificados={}, filasDescartadas={}",
+                    customers.size(), geocodedCustomers, invalidRows);
+
             if (customers.isEmpty()) {
+                log.warn("No se encontraron pedidos validos con coordenadas tras procesar el archivo {}", file.getOriginalFilename());
                 return ResponseEntity.badRequest().body("No se encontraron pedidos válidos con coordenadas.");
             }
 
             // Optimizar Rutas (Pasando la ubicación del depósito)
+            log.info("Iniciando optimizacion de rutas para {} clientes.", customers.size());
             VehicleRoutingSolution solution = routeOptimizationService.optimizeRoutes(customers, depotLocation, carryCount, nhrCount, nprCount);
+            log.info("Optimizacion finalizada. Vehiculos generados={}, clientesAsignados={}",
+                    solution.getVehicleList().size(),
+                    solution.getVehicleList().stream().mapToInt(v -> v.getCustomers().size()).sum());
 
             // Preparar respuesta simplificada
             Map<String, Object> response = new HashMap<>();
@@ -180,13 +207,15 @@ public class RouteController {
             response.put("totalVehiclesUsed", routes.size());
             response.put("routes", routes);
             response.put("unassigned", customers.size() - solution.getVehicleList().stream().mapToInt(v -> v.getCustomers().size()).sum());
+            log.info("Respuesta lista. rutasMostradas={}, pedidosNoAsignados={}", routes.size(), response.get("unassigned"));
 
             return ResponseEntity.ok(response);
 
         } catch (IOException e) {
+            log.error("Error procesando el archivo Excel: {}", file.getOriginalFilename(), e);
             return ResponseEntity.internalServerError().body("Error al procesar el archivo: " + e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error general durante la carga y optimizacion del archivo: {}", file.getOriginalFilename(), e);
             return ResponseEntity.badRequest().body("Error en el formato de datos o en la optimización: " + e.getMessage());
         }
     }
@@ -250,13 +279,16 @@ public class RouteController {
         try {
             return row.getDouble(colName);
         } catch (Exception e) {
+            log.debug("No se pudo leer la columna {} como double directamente. Se intentara parsear como texto.", colName);
             try {
                 // Intentar parsear string a double si la columna no es numérica
                 String val = row.getString(colName);
                 if (val != null && !val.trim().isEmpty()) {
                     return Double.parseDouble(val.replace(",", ".")); // Manejar decimales con coma
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception parseException) {
+                log.debug("No se pudo parsear la columna {} con valor textual a double.", colName, parseException);
+            }
         }
         return 0.0;
     }
@@ -265,6 +297,7 @@ public class RouteController {
      * Lee un archivo Excel usando Apache POI y devuelve una Tabla de Tablesaw con todas las columnas como String
      */
     private Table readExcelAsStrings(File file) throws IOException {
+        log.info("Iniciando lectura del archivo Excel como texto: {}", file.getAbsolutePath());
         List<String> columnNames = new ArrayList<>();
         List<List<String>> rows = new ArrayList<>();
 
@@ -273,6 +306,7 @@ public class RouteController {
 
             XSSFSheet sheet = workbook.getSheetAt(0);
             if (sheet == null) {
+                log.warn("El archivo Excel no contiene hojas utilizables: {}", file.getAbsolutePath());
                 return Table.create();
             }
 
@@ -322,6 +356,7 @@ public class RouteController {
             table.addColumns(col);
         }
 
+        log.info("Lectura de Excel completada. columnas={}, filas={}", columnNames.size(), rows.size());
         return table;
     }
 

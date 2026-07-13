@@ -188,6 +188,13 @@
             const nhrCountVal = document.getElementById('nhrCount')?.value || '10';
             formData.append('carryCount', carryCountVal);
             formData.append('nhrCount', nhrCountVal);
+            console.info('[AutoRuteo] Enviando archivo para procesamiento', {
+                fileName: fileInput.files[0].name,
+                fileSize: fileInput.files[0].size,
+                depotAddress,
+                carryCount: carryCountVal,
+                nhrCount: nhrCountVal
+            });
 
             statusMessage.textContent = "Procesando y optimizando rutas... esto puede tardar unos segundos.";
             loader.style.display = "block";
@@ -198,12 +205,21 @@
                     method: 'POST',
                     body: formData
                 });
+                console.info('[AutoRuteo] Respuesta recibida de /api/routes/upload', {
+                    ok: response.ok,
+                    status: response.status
+                });
 
                 if (!response.ok) {
                     throw new Error(await response.text());
                 }
 
                 const data = await response.json();
+                console.info('[AutoRuteo] Rutas procesadas correctamente', {
+                    totalVehiclesUsed: data.totalVehiclesUsed,
+                    unassigned: data.unassigned,
+                    routes: data.routes?.length || 0
+                });
                 currentRoutesData = data.routes;
                 loader.style.display = "none";
                 
@@ -257,6 +273,7 @@
                 mapContainer.scrollIntoView({ behavior: 'smooth' });
 
             } catch (error) {
+                console.error('[AutoRuteo] Error procesando archivo de rutas', error);
                 loader.style.display = "none";
                 statusMessage.textContent = "Error: " + error.message;
                 statusMessage.style.color = '#e74c3c';
@@ -431,11 +448,17 @@
 
         async function exportRoutes(format) {
             if (!currentRoutesData || currentRoutesData.length === 0) {
+                console.warn('[AutoRuteo] Se intento exportar sin rutas cargadas');
                 alert("No hay rutas para exportar.");
                 return;
             }
 
             const url = format === 'pdf' ? '/api/export/pdf' : '/api/export/excel';
+            console.info('[AutoRuteo] Iniciando exportacion', {
+                format,
+                url,
+                routes: currentRoutesData.length
+            });
             
             try {
                 const response = await fetch(url, {
@@ -445,9 +468,18 @@
                     },
                     body: JSON.stringify(currentRoutesData)
                 });
+                console.info('[AutoRuteo] Respuesta recibida de exportacion', {
+                    format,
+                    ok: response.ok,
+                    status: response.status
+                });
 
                 if (response.ok) {
                     const blob = await response.blob();
+                    console.info('[AutoRuteo] Archivo exportado correctamente', {
+                        format,
+                        bytes: blob.size
+                    });
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
@@ -457,10 +489,11 @@
                     a.remove();
                 } else {
                     const errorText = await response.text();
+                    console.error('[AutoRuteo] Error en exportacion', { format, errorText });
                     alert("Error al descargar el archivo: " + errorText);
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('[AutoRuteo] Error al conectar con el servidor durante exportacion', error);
                 alert("Error al conectar con el servidor.");
             }
         }

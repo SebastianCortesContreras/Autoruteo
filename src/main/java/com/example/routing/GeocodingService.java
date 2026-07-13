@@ -8,9 +8,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class GeocodingService {
+
+    private static final Logger log = LoggerFactory.getLogger(GeocodingService.class);
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -31,12 +35,13 @@ public class GeocodingService {
     public double[] geocodeAddress(String address) {
         try {
             if (address == null || address.trim().isEmpty()) {
+                log.warn("Se recibio una direccion vacia para geocodificar.");
                 return null;
             }
 
             // Check hardcoded locations first
             if (HARDCODED_LOCATIONS.containsKey(address)) {
-                System.out.println("Using hardcoded coordinates for: " + address);
+                log.info("Usando coordenadas hardcodeadas para la direccion: {}", address);
                 return HARDCODED_LOCATIONS.get(address);
             }
 
@@ -46,11 +51,13 @@ public class GeocodingService {
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             String url = NOMINATIM_API + address.replace(" ", "+");
+            log.info("Realizando peticion de geocodificacion para direccion: {}", address);
             
             // Respect API usage policy (1 request per second max recommended)
             Thread.sleep(1000); 
 
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            log.info("Respuesta de geocodificacion recibida para direccion: {} con estado: {}", address, response.getStatusCode());
             
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
@@ -58,11 +65,19 @@ public class GeocodingService {
                     JsonNode firstResult = root.get(0);
                     double lat = firstResult.get("lat").asDouble();
                     double lon = firstResult.get("lon").asDouble();
+                    log.info("Geocodificacion exitosa para direccion: {} -> lat={}, lon={}", address, lat, lon);
                     return new double[]{lat, lon};
                 }
+
+                log.warn("La respuesta de geocodificacion no trajo resultados para direccion: {}", address);
+            } else {
+                log.warn("La geocodificacion fallo para direccion: {}. Estado={}, bodyPresente={}",
+                        address,
+                        response.getStatusCode(),
+                        response.getBody() != null);
             }
         } catch (Exception e) {
-            System.err.println("Error geocoding address '" + address + "': " + e.getMessage());
+            log.error("Error geocodificando la direccion: {}", address, e);
         }
         return null;
     }
