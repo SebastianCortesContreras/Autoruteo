@@ -26,7 +26,7 @@ public class RouteOptimizationService {
                 .withSolutionClass(VehicleRoutingSolution.class)
                 .withEntityClasses(Vehicle.class)
                 .withConstraintProviderClass(VehicleRoutingConstraintProvider.class)
-                .withTerminationSpentLimit(Duration.ofSeconds(30)); // Dar mas tiempo para encontrar una solucion factible
+                .withTerminationSpentLimit(Duration.ofSeconds(10)); // Reducir carga en Railway y responder mas rapido
 
         this.solverFactory = SolverFactory.create(solverConfig);
     }
