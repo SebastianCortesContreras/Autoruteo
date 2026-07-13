@@ -11,4 +11,12 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/routing-automation-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+# Explicit heap sizing keeps memory usage predictable on constrained Railway
+# instances. Without -Xmx, the JVM defaults to 25% of container memory, which
+# combined with unbounded Timefold solving was causing OOM restarts.
+# UseSerialGC further reduces memory overhead (no extra GC bookkeeping
+# structures), which matters more than throughput for this low-heap workload.
+ENV JAVA_OPTS="-Xms512m -Xmx768m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
