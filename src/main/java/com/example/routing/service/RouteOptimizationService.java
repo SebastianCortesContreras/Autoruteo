@@ -32,7 +32,7 @@ public class RouteOptimizationService {
     }
 
     public VehicleRoutingSolution optimizeRoutes(List<Customer> customers, Location depotLocation, Integer carryCount, Integer nhrCount, Integer nprCount) {
-        log.info("Iniciando optimizacion. customers={}, depotDefinido={}, carryCount={}, nhrCount={}, nprCount={}",
+        log.debug("Iniciando optimizacion. customers={}, depotDefinido={}, carryCount={}, nhrCount={}, nprCount={}",
                 customers.size(), depotLocation != null, carryCount, nhrCount, nprCount);
         if (customers.isEmpty()) {
             log.warn("Se solicito optimizacion sin clientes.");
@@ -42,23 +42,23 @@ public class RouteOptimizationService {
         // 1. Determinar ubicación del depósito (Si es null, usar Centroide)
         if (depotLocation == null) {
             depotLocation = calculateCentroid(customers);
-            log.info("No se recibio deposito. Se usara el centroide calculado: lat={}, lon={}",
+            log.debug("No se recibio deposito. Se usara el centroide calculado: lat={}, lon={}",
                     depotLocation.getLatitude(), depotLocation.getLongitude());
         }
         Depot depot = new Depot(depotLocation);
 
         // 2. Generar flota de vehículos
         List<Vehicle> vehicles = generateVehicleFleet(customers, depot, carryCount, nhrCount, nprCount);
-        log.info("Flota generada. totalVehiculos={}", vehicles.size());
+        log.debug("Flota generada. totalVehiculos={}", vehicles.size());
 
         // 3. Crear problema
         VehicleRoutingSolution problem = new VehicleRoutingSolution(vehicles, customers);
 
         // 4. Crear nuevo Solver y resolver
         Solver<VehicleRoutingSolution> solver = solverFactory.buildSolver();
-        log.info("Ejecutando solver Timefold.");
+        log.debug("Ejecutando solver Timefold.");
         VehicleRoutingSolution solution = solver.solve(problem);
-        log.info("Solver finalizado. vehiculosResueltos={}, clientesAsignados={}",
+        log.debug("Solver finalizado. vehiculosResueltos={}, clientesAsignados={}",
                 solution.getVehicleList().size(),
                 solution.getVehicleList().stream().mapToInt(v -> v.getCustomers().size()).sum());
 
@@ -70,7 +70,7 @@ public class RouteOptimizationService {
         
         // 5. Post-procesamiento (Etiquetado de rutas)
         postProcessRoutes(solution);
-        log.info("Post-procesamiento finalizado.");
+        log.debug("Post-procesamiento finalizado.");
         
         return solution;
     }
@@ -102,7 +102,7 @@ public class RouteOptimizationService {
 
             vehicle.setRouteStatus(status);
             vehicle.setComments(status); // Mantener compatibilidad si se usa 'comments' en otro lado
-            log.info("Vehiculo {} etiquetado. status={}, paradas={}, distanciaMetros={}, pesoTotal={}, excesoZonaMetros={}",
+            log.debug("Vehiculo {} etiquetado. status={}, paradas={}, distanciaMetros={}, pesoTotal={}, excesoZonaMetros={}",
                     vehicle.getId(), status, stopCount, distanceMeters, totalWeight, exceededZoneMeters);
         }
     }
@@ -118,7 +118,7 @@ public class RouteOptimizationService {
     private Location calculateCentroid(List<Customer> customers) {
         double avgLat = customers.stream().mapToDouble(c -> c.getLocation().getLatitude()).average().orElse(0.0);
         double avgLon = customers.stream().mapToDouble(c -> c.getLocation().getLongitude()).average().orElse(0.0);
-        log.info("Centroide calculado para {} clientes: lat={}, lon={}", customers.size(), avgLat, avgLon);
+        log.debug("Centroide calculado para {} clientes: lat={}, lon={}", customers.size(), avgLat, avgLon);
         return new Location(avgLat, avgLon);
     }
 
@@ -165,7 +165,7 @@ public class RouteOptimizationService {
             vehicles.add(new Vehicle("Hypothetical-" + (i + 1), 10000.0, "Hipotético", depot, 100_000_000));
         }
 
-        log.info("Flota lista para {} clientes. carrys={}, nhrs={}, nprs={}, total={}",
+        log.debug("Flota lista para {} clientes. carrys={}, nhrs={}, nprs={}, total={}",
                 customers.size(), numCarrys * 2, numNHRs, numNPRs, vehicles.size());
         return vehicles;
     }
