@@ -3,7 +3,7 @@ let map = null;
 let currentJobPoller = null;
 
 const windowLabelMap = {
-    WINDOW_1: '08:00 - 11:59',
+    WINDOW_1: '08:00 - 10:59',
     WINDOW_2: '08:01 - 17:00',
     WINDOW_3: '12:00 - 16:59'
 };

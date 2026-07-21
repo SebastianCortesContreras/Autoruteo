@@ -39,11 +39,14 @@ public class RouteUploadProcessingService {
 
     private final GeocodingService geocodingService;
     private final RouteOptimizationService routeOptimizationService;
+    private final RoutePlanResponseBuilder routePlanResponseBuilder;
 
     public RouteUploadProcessingService(GeocodingService geocodingService,
-                                        RouteOptimizationService routeOptimizationService) {
+                                        RouteOptimizationService routeOptimizationService,
+                                        RoutePlanResponseBuilder routePlanResponseBuilder) {
         this.geocodingService = geocodingService;
         this.routeOptimizationService = routeOptimizationService;
+        this.routePlanResponseBuilder = routePlanResponseBuilder;
     }
 
     public Map<String, Object> process(RouteUploadRequest request, Consumer<ProcessingProgress> progressListener) throws IOException {
@@ -151,10 +154,10 @@ public class RouteUploadProcessingService {
 
             log.info("Optimizacion finalizada. Vehiculos generados={}, clientesAsignados={}",
                     solution.getVehicleList().size(),
-                    solution.getVehicleList().stream().mapToInt(v -> v.getCustomers().size()).sum());
+                    solution.getVehicleList().stream().mapToInt(Vehicle::getTotalOrderCount).sum());
 
             publishProgress(progressListener, "BUILDING_RESPONSE", 92, "Armando la respuesta final para la interfaz.");
-            Map<String, Object> response = buildResponse(customers, solution);
+            Map<String, Object> response = routePlanResponseBuilder.buildResponse(customers, solution);
 
             publishProgress(progressListener, "COMPLETED", 100, "Proceso completado correctamente.");
             return response;
@@ -166,54 +169,6 @@ public class RouteUploadProcessingService {
                 log.warn("No se pudieron limpiar los archivos temporales de {}", tempFile, cleanupException);
             }
         }
-    }
-
-    private Map<String, Object> buildResponse(List<Customer> customers, VehicleRoutingSolution solution) {
-        Map<String, Object> response = new HashMap<>();
-        List<Map<String, Object>> routes = new ArrayList<>();
-
-        for (Vehicle vehicle : solution.getVehicleList()) {
-            if (!vehicle.getCustomers().isEmpty()) {
-                Map<String, Object> route = new HashMap<>();
-                route.put("vehicleId", vehicle.getId());
-                route.put("vehicleType", vehicle.getType());
-                route.put("capacity", vehicle.getCapacity());
-                route.put("totalLoad", vehicle.getTotalDemand());
-                route.put("totalDistance", vehicle.getTotalDistanceMeters());
-                route.put("totalDistanceKm", String.format("%.2f km", vehicle.getTotalDistanceMeters() / 1000.0));
-                route.put("comments", vehicle.getComments());
-                route.put("routeStatus", vehicle.getRouteStatus());
-
-                List<Map<String, Object>> ordersWithInfo = new ArrayList<>();
-                Location previousLocation = vehicle.getDepot().getLocation();
-                long accumulatedDistance = 0;
-
-                for (Customer customer : vehicle.getCustomers()) {
-                    long legDistance = previousLocation.getDistanceTo(customer.getLocation());
-                    accumulatedDistance += legDistance;
-
-                    Map<String, Object> orderInfo = new HashMap<>();
-                    orderInfo.put("id", customer.getId());
-                    orderInfo.put("name", customer.getName());
-                    orderInfo.put("address", customer.getAddress());
-                    orderInfo.put("demand", customer.getDemand());
-                    orderInfo.put("deliveryWindow", customer.getDeliveryWindow());
-                    orderInfo.put("location", customer.getLocation());
-                    orderInfo.put("accumulatedDistanceKm", String.format("%.2f km", accumulatedDistance / 1000.0));
-
-                    ordersWithInfo.add(orderInfo);
-                    previousLocation = customer.getLocation();
-                }
-                route.put("orders", ordersWithInfo);
-
-                routes.add(route);
-            }
-        }
-
-        response.put("totalVehiclesUsed", routes.size());
-        response.put("routes", routes);
-        response.put("unassigned", customers.size() - solution.getVehicleList().stream().mapToInt(v -> v.getCustomers().size()).sum());
-        return response;
     }
 
     private void publishProgress(Consumer<ProcessingProgress> progressListener, String stage, int progress, String message) {
@@ -232,12 +187,29 @@ public class RouteUploadProcessingService {
         }
 
         String normalized = raw.trim().toLowerCase();
-        if (normalized.contains("08:00") && normalized.contains("11:59")) {
+
+        if (normalized.isEmpty()) {
+            return "WINDOW_2";
+        }
+
+        if (normalized.contains("window_1") || normalized.contains("franja 1")) {
             return "WINDOW_1";
         }
-        if ((normalized.contains("12:00") || normalized.contains("12:30")) && normalized.contains("16:59")) {
+
+        if (normalized.contains("window_3") || normalized.contains("franja 3")) {
             return "WINDOW_3";
         }
+
+        if ((normalized.contains("08:00") || normalized.contains("8:00"))
+                && (normalized.contains("10:59") || normalized.contains("11:59"))) {
+            return "WINDOW_1";
+        }
+
+        if ((normalized.contains("12:00") || normalized.contains("12:30"))
+                && normalized.contains("16:59")) {
+            return "WINDOW_3";
+        }
+
         return "WINDOW_2";
     }
 

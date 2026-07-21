@@ -17,23 +17,23 @@ public class VehicleRoutingSolution {
 
     @ValueRangeProvider
     @ProblemFactCollectionProperty
-    private List<Customer> customerList;
+    private List<RouteStop> stopList;
 
     @PlanningScore
     private HardSoftLongScore score;
 
     public VehicleRoutingSolution() {}
 
-    public VehicleRoutingSolution(List<Vehicle> vehicleList, List<Customer> customerList) {
+    public VehicleRoutingSolution(List<Vehicle> vehicleList, List<RouteStop> stopList) {
         this.vehicleList = vehicleList;
-        this.customerList = customerList;
+        this.stopList = stopList;
     }
 
     public List<Vehicle> getVehicleList() { return vehicleList; }
     public void setVehicleList(List<Vehicle> vehicleList) { this.vehicleList = vehicleList; }
 
-    public List<Customer> getCustomerList() { return customerList; }
-    public void setCustomerList(List<Customer> customerList) { this.customerList = customerList; }
+    public List<RouteStop> getStopList() { return stopList; }
+    public void setStopList(List<RouteStop> stopList) { this.stopList = stopList; }
 
     public HardSoftLongScore getScore() { return score; }
     public void setScore(HardSoftLongScore score) { this.score = score; }

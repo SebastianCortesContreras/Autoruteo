@@ -38,7 +38,7 @@ public class ExportController {
             return "";
         }
         return switch (windowCode.trim()) {
-            case "WINDOW_1" -> "08:00-11:59";
+            case "WINDOW_1" -> "08:00-10:59";
             case "WINDOW_3" -> "12:30-16:59";
             default -> "08:01-17:00"; // WINDOW_2 o cualquier otro
         };
