@@ -12,6 +12,7 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
     private static volatile long maxRouteDistanceMeters = 40_000L;
     private static volatile long maxLegDistanceMeters = 5_000L;
     private static volatile long maxClusterRadiusMeters = 10_000L;
+    private static volatile long maxInterStopDistanceMeters = 10_000L;
     private static volatile double carryHeavyOrderThresholdKg = 500.0;
     private static volatile double nprHeavyOrderThresholdKg = 3_000.0;
     private static volatile int nhrMaxOrders = 10;
@@ -31,6 +32,7 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
         maxRouteDistanceMeters = rules.getMaxRouteDistanceMeters();
         maxLegDistanceMeters = rules.getMaxLegDistanceMeters();
         maxClusterRadiusMeters = rules.getMaxClusterRadiusMeters();
+        maxInterStopDistanceMeters = rules.getMaxInterStopDistanceMeters();
         carryHeavyOrderThresholdKg = rules.getCarryHeavyOrderThresholdKg();
         nprHeavyOrderThresholdKg = rules.getNprHeavyOrderThresholdKg();
         nhrMaxOrders = rules.getNhrMaxOrders();
@@ -49,6 +51,7 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
             vehicleCapacity(factory),
             maxRouteDistance(factory),
             maxDistanceBetweenStops(factory),
+            maxDistanceBetweenAnyDeliveryPoints(factory),
             noFirstWindowOnSecondTrip(factory),
             heavyOrdersInCarry(factory),
             nhrMaxOrders(factory),
@@ -87,6 +90,14 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
                 .penalizeLong(HardSoftLongScore.ONE_HARD,
                         vehicle -> vehicle.getExceededLegDistanceMeters(maxLegDistanceMeters))
                 .asConstraint("Max distance between stops");
+    }
+
+    protected Constraint maxDistanceBetweenAnyDeliveryPoints(ConstraintFactory factory) {
+        return factory.forEach(Vehicle.class)
+                .filter(vehicle -> vehicle.hasInterStopDistanceLongerThan(maxInterStopDistanceMeters))
+                .penalizeLong(HardSoftLongScore.ONE_HARD,
+                        vehicle -> vehicle.getExceededInterStopDistanceMeters(maxInterStopDistanceMeters))
+                .asConstraint("Max distance between any delivery points");
     }
 
     protected Constraint noFirstWindowOnSecondTrip(ConstraintFactory factory) {

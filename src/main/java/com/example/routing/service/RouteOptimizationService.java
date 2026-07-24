@@ -248,13 +248,15 @@ public class RouteOptimizationService {
         List<RouteStop> availableStops = new ArrayList<>(candidates);
 
         for (Vehicle vehicle : vehicles) {
-            RouteStop seed = selectSeedStop(vehicle, availableStops, stopFilter, clusterRadiusMeters, depot, preferFartherSeeds);
-            if (seed == null) {
-                continue;
-            }
+            if (!vehicle.isUsed()) {
+                RouteStop seed = selectSeedStop(vehicle, availableStops, stopFilter, clusterRadiusMeters, depot, preferFartherSeeds);
+                if (seed == null) {
+                    continue;
+                }
 
-            vehicle.getStops().add(seed);
-            availableStops.remove(seed);
+                vehicle.getStops().add(seed);
+                availableStops.remove(seed);
+            }
 
             boolean added;
             do {
@@ -331,12 +333,17 @@ public class RouteOptimizationService {
     }
 
     private boolean isCompactWithCurrentRoute(Vehicle vehicle, RouteStop candidate, long clusterRadiusMeters) {
-        if (vehicle.getStops().size() <= 1) {
+        if (vehicle.getStops().isEmpty()) {
             return true;
         }
 
+        long maxInterStopDistanceMeters = rules.getMaxInterStopDistanceMeters();
         return vehicle.getStops().stream()
-                .allMatch(existingStop -> existingStop.getLocation().getDistanceTo(candidate.getLocation()) <= clusterRadiusMeters);
+                .allMatch(existingStop -> {
+                    long distanceToExistingStop = existingStop.getLocation().getDistanceTo(candidate.getLocation());
+                    return distanceToExistingStop <= clusterRadiusMeters
+                            && distanceToExistingStop <= maxInterStopDistanceMeters;
+                });
     }
 
     private double getAverageDistanceToRoute(Vehicle vehicle, RouteStop candidate) {
@@ -448,6 +455,10 @@ public class RouteOptimizationService {
             }
             if ("NPR".equals(vehicle.getType()) && vehicle.getTotalOrderCount() > rules.getNprMaxOrders()) {
                 return "el vehiculo " + vehicle.getId() + " supera el maximo de pedidos NPR";
+            }
+            if (vehicle.hasInterStopDistanceLongerThan(rules.getMaxInterStopDistanceMeters())) {
+                return "el vehiculo " + vehicle.getId() + " tiene puntos de entrega separados por mas de "
+                        + (rules.getMaxInterStopDistanceMeters() / 1000) + " km";
             }
         }
         return null;

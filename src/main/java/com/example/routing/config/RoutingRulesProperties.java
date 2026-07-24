@@ -11,6 +11,7 @@ public class RoutingRulesProperties {
     private long maxRouteDistanceMeters = 40_000L;
     private long maxLegDistanceMeters = 5_000L;
     private long maxClusterRadiusMeters = 10_000L;
+    private long maxInterStopDistanceMeters = 10_000L;
     private long urbanClusterRadiusMeters = 6_000L;
     private long outOfCityClusterRadiusMeters = 18_000L;
     private long outOfCityThresholdMeters = 15_000L;
@@ -70,6 +71,14 @@ public class RoutingRulesProperties {
 
     public void setMaxClusterRadiusMeters(long maxClusterRadiusMeters) {
         this.maxClusterRadiusMeters = maxClusterRadiusMeters;
+    }
+
+    public long getMaxInterStopDistanceMeters() {
+        return maxInterStopDistanceMeters;
+    }
+
+    public void setMaxInterStopDistanceMeters(long maxInterStopDistanceMeters) {
+        this.maxInterStopDistanceMeters = maxInterStopDistanceMeters;
     }
 
     public long getUrbanClusterRadiusMeters() {

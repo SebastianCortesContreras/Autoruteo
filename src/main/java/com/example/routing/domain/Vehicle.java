@@ -199,6 +199,29 @@ public class Vehicle {
         return exceededDistance;
     }
 
+    public boolean hasInterStopDistanceLongerThan(long limitMeters) {
+        return getExceededInterStopDistanceMeters(limitMeters) > 0L;
+    }
+
+    public long getExceededInterStopDistanceMeters(long limitMeters) {
+        if (stops.size() <= 1) {
+            return 0L;
+        }
+
+        long exceededDistance = 0L;
+        for (int i = 0; i < stops.size() - 1; i++) {
+            Location firstLocation = stops.get(i).getLocation();
+            for (int j = i + 1; j < stops.size(); j++) {
+                long distanceBetweenStops = firstLocation.getDistanceTo(stops.get(j).getLocation());
+                if (distanceBetweenStops > limitMeters) {
+                    exceededDistance += distanceBetweenStops - limitMeters;
+                }
+            }
+        }
+
+        return exceededDistance;
+    }
+
     public double getTotalDemand() {
         return stops.stream().mapToDouble(RouteStop::getTotalDemand).sum();
     }
