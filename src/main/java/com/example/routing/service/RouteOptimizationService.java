@@ -161,18 +161,9 @@ public class RouteOptimizationService {
         List<RouteStop> unassigned = new ArrayList<>(stops);
         unassigned.removeIf(assignedStops::contains);
 
-        assignStopsToVehicleGroup(unassigned, fleet, Vehicle::isHypothetical, stop -> true,
-                rules.getOutOfCityClusterRadiusMeters(), depot, true);
-
-        assignedStops = fleet.stream()
-                .flatMap(vehicle -> vehicle.getStops().stream())
-                .distinct()
-                .toList();
-        unassigned = new ArrayList<>(stops);
-        unassigned.removeIf(assignedStops::contains);
-
         if (!unassigned.isEmpty()) {
-            throw new IllegalStateException("Quedaron paradas sin asignar aun usando toda la flota disponible.");
+            log.warn("Quedaron {} paradas sin asignar con la flota disponible. Se devolvera una respuesta parcial.",
+                    unassigned.size());
         }
 
         for (Vehicle vehicle : fleet) {

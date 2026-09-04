@@ -160,6 +160,136 @@
             </div>
         </section>
 
+        <section id="mapEditorPanel" class="card section-card map-editor-panel hidden-section">
+            <div class="section-header map-editor-header">
+                <div>
+                    <h2 class="section-title">Edición manual en mapa</h2>
+                    <p id="mapEditorHint" class="section-subtitle">Activa el modo edición para mover pedidos entre rutas y ajustar el orden directamente sobre el mapa.</p>
+                </div>
+
+                <button id="toggleEditModeBtn" type="button" class="btn btn-ghost">
+                    <span class="material-symbols-outlined">edit_location_alt</span>
+                    Activar edición manual
+                </button>
+            </div>
+
+            <div id="pendingChangesPanel" class="pending-changes-panel">
+                <div class="pending-changes-header">
+                    <div>
+                        <h3 class="map-editor-card-title">Cambios pendientes</h3>
+                        <p id="pendingChangesDescription" class="section-subtitle">Todavía no hay cambios manuales acumulados.</p>
+                    </div>
+                    <div class="pending-changes-actions">
+                        <button id="viewChangesSummaryBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">notes</span>
+                            Ver resumen
+                        </button>
+                        <button id="discardChangesBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">delete_sweep</span>
+                            Descartar cambios
+                        </button>
+                        <button id="saveManualChangesBtn" type="button" class="btn btn-primary" disabled>
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar cambios manuales
+                        </button>
+                    </div>
+                </div>
+
+                <div id="pendingChangesMetrics" class="pending-changes-metrics">
+                    <div class="summary-chip">
+                        <span class="material-symbols-outlined">edit_note</span>
+                        <span><span class="summary-label">Cambios</span> 0</span>
+                    </div>
+                    <div class="summary-chip">
+                        <span class="material-symbols-outlined">alt_route</span>
+                        <span><span class="summary-label">Rutas afectadas</span> 0</span>
+                    </div>
+                    <div class="summary-chip">
+                        <span class="material-symbols-outlined">route</span>
+                        <span><span class="summary-label">Δ km estimado</span> 0.00 km</span>
+                    </div>
+                    <div class="summary-chip">
+                        <span class="material-symbols-outlined">warning</span>
+                        <span><span class="summary-label">Riesgos</span> 0</span>
+                    </div>
+                </div>
+
+                <div id="pendingChangesSummary" class="pending-changes-summary">
+                    <div class="editor-empty-state">Confirma movimientos o reordenamientos para ver el resumen acumulado.</div>
+                </div>
+            </div>
+
+            <div class="map-editor-grid">
+                <div class="map-editor-card">
+                    <h3 class="map-editor-card-title">Pedido seleccionado</h3>
+                    <p id="selectedOrderInfo" class="section-subtitle">Selecciona un pedido en el mapa para moverlo de ruta o cambiar su posición.</p>
+                </div>
+
+                <div class="map-editor-card">
+                    <h3 class="map-editor-card-title">Rutas sugeridas</h3>
+                    <div id="suggestedMovesList" class="suggested-moves-list">
+                        <div class="editor-empty-state">Selecciona un pedido para ver las mejores rutas sugeridas.</div>
+                    </div>
+                </div>
+
+                <div class="map-editor-card">
+                    <h3 class="map-editor-card-title">Previsualizar movimiento</h3>
+                    <div class="map-editor-actions">
+                        <select id="targetRouteSelect" class="select" disabled>
+                            <option value="">Selecciona una ruta destino</option>
+                        </select>
+                        <button id="moveToRouteBtn" type="button" class="btn btn-primary" disabled>
+                            <span class="material-symbols-outlined">preview</span>
+                            Previsualizar
+                        </button>
+                    </div>
+                    <div id="movePreviewInfo" class="move-preview-panel is-empty">
+                        <div class="editor-empty-state">Aún no hay un movimiento en vista previa.</div>
+                    </div>
+                    <div class="map-editor-actions map-editor-actions--compact">
+                        <button id="confirmMoveBtn" type="button" class="btn btn-primary" disabled>
+                            <span class="material-symbols-outlined">check_circle</span>
+                            Confirmar cambio
+                        </button>
+                        <button id="cancelPreviewBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">cancel</span>
+                            Cancelar vista previa
+                        </button>
+                    </div>
+                </div>
+
+                <div class="map-editor-card">
+                    <h3 class="map-editor-card-title">Editar y deshacer</h3>
+                    <div class="map-editor-actions map-editor-actions--compact">
+                        <button id="unassignOrderBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">remove_road</span>
+                            Desasignar
+                        </button>
+                        <button id="moveOrderUpBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">arrow_upward</span>
+                            Subir
+                        </button>
+                        <button id="moveOrderDownBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">arrow_downward</span>
+                            Bajar
+                        </button>
+                        <button id="clearSelectionBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">close</span>
+                            Limpiar selección
+                        </button>
+                        <button id="undoEditBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">undo</span>
+                            Deshacer último cambio
+                        </button>
+                        <button id="resetEditsBtn" type="button" class="btn btn-ghost" disabled>
+                            <span class="material-symbols-outlined">history</span>
+                            Volver al resultado original
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <div id="map"></div>
 
         <section id="routes-container" class="card section-card hidden-section">
@@ -183,7 +313,33 @@
             </div>
 
             <div id="routes-summary" class="summary-chips"></div>
-            <div id="routes-list"></div>
+            <div class="routes-layout">
+                <div class="routes-main">
+                    <div id="routes-list"></div>
+                </div>
+
+                <aside id="unassignedSidebar" class="unassigned-sidebar hidden-section">
+                    <div class="unassigned-sidebar-header">
+                        <div>
+                            <h3 class="map-editor-card-title">Sin asignar</h3>
+                            <p class="section-subtitle">Pedidos en gris, listos para reasignar.</p>
+                        </div>
+                        <div id="unassignedCountChip" class="summary-chip">0</div>
+                    </div>
+
+                    <div class="map-editor-actions">
+                        <input id="unassignedSearchInput" class="input" type="text" placeholder="Buscar por ID, cliente o dirección" />
+                        <select id="unassignedWindowFilter" class="select">
+                            <option value="ALL">Todas las franjas</option>
+                            <option value="WINDOW_1">08:00 - 10:59</option>
+                            <option value="WINDOW_2">08:01 - 17:00</option>
+                            <option value="WINDOW_3">12:00 - 16:59</option>
+                        </select>
+                    </div>
+
+                    <div id="unassignedList" class="unassigned-list"></div>
+                </aside>
+            </div>
         </section>
     </div>
 

@@ -31,6 +31,7 @@ public class RoutePlanResponseBuilder {
             route.put("totalLoad", vehicle.getTotalDemand());
             route.put("totalDistance", vehicle.getTotalDistanceMeters());
             route.put("totalDistanceKm", String.format("%.2f km", vehicle.getTotalDistanceMeters() / 1000.0));
+            route.put("depotLocation", vehicle.getDepot().getLocation());
             route.put("comments", vehicle.getComments());
             route.put("routeStatus", vehicle.getRouteStatus());
 
