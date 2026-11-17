@@ -41,7 +41,7 @@ public class SecurityConfig {
     public UserDetailsService userDetailsService() {
         UserDetails admin = User.builder()
                 .username("Sebastian.zubale")
-                .password("Controltower2026")
+                .password("Cualquiera01")
                 .roles("ADMIN")
                 .build();
 
